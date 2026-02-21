@@ -122,18 +122,24 @@ export default function EmployeeDashboard() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
+          console.log('[Realtime] Task event received:', payload.eventType, payload);
           // For DELETE events, the old record has the assigned_to
           // For INSERT/UPDATE, check the new record
           const taskData = payload.new || payload.old;
           const assignedTo = taskData?.assigned_to;
           
+          console.log('[Realtime] Task assigned_to:', assignedTo, 'Current user:', profile.id);
+          
           // Only refresh if this task was assigned to current user
           if (assignedTo === profile.id) {
+            console.log('[Realtime] Refreshing tasks for current user');
             refresh();
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Subscription status:', status);
+      });
 
     return () => {
       channel.unsubscribe();
