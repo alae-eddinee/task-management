@@ -12,6 +12,12 @@ export function OnlineUsers({ currentUserId }: OnlineUsersProps) {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
 
   useEffect(() => {
+    const ENABLE_REALTIME_PRESENCE = false;
+    if (!ENABLE_REALTIME_PRESENCE) {
+      setOnlineUsers([]);
+      return;
+    }
+
     const channel = supabase.channel('online-users', {
       config: {
         presence: {
@@ -62,7 +68,7 @@ export function OnlineUsers({ currentUserId }: OnlineUsersProps) {
   if (onlineUsers.length === 0) return null;
 
   return (
-    <div className="fixed right-4 bottom-4 bg-white border border-[var(--border)] rounded-lg shadow-lg p-3 w-48 z-30">
+    <div className="fixed right-2 sm:right-4 bottom-2 sm:bottom-4 bg-white border border-[var(--border)] rounded-lg shadow-lg p-2 sm:p-3 w-40 sm:w-48 z-30">
       <h3 className="text-xs font-semibold text-[var(--foreground-tertiary)] uppercase mb-2">
         Online Now
       </h3>
@@ -70,7 +76,7 @@ export function OnlineUsers({ currentUserId }: OnlineUsersProps) {
         {onlineUsers.map((user) => (
           <li key={user.user_id} className="flex items-center gap-2">
             <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-sm text-[var(--foreground)] truncate">{user.user_name}</span>
+            <span className="text-xs sm:text-sm text-[var(--foreground)] truncate">{user.user_name}</span>
           </li>
         ))}
       </ul>

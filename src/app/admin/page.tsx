@@ -233,64 +233,64 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
           <Card>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
-                <Users className="w-5 h-5" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <p className="text-sm text-[var(--foreground-tertiary)]">Total Users</p>
-                <p className="text-xl font-bold">{stats.total}</p>
+                <p className="text-xs sm:text-sm text-[var(--foreground-tertiary)]">Total</p>
+                <p className="text-lg sm:text-xl font-bold">{stats.total}</p>
               </div>
             </div>
           </Card>
           <Card>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center text-white">
-                <Shield className="w-5 h-5" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 rounded-lg flex items-center justify-center text-white">
+                <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <p className="text-sm text-[var(--foreground-tertiary)]">Admins</p>
-                <p className="text-xl font-bold">{stats.admins}</p>
+                <p className="text-xs sm:text-sm text-[var(--foreground-tertiary)]">Admins</p>
+                <p className="text-lg sm:text-xl font-bold">{stats.admins}</p>
               </div>
             </div>
           </Card>
           <Card>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center text-white">
-                <Users className="w-5 h-5" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-500 rounded-lg flex items-center justify-center text-white">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <p className="text-sm text-[var(--foreground-tertiary)]">Managers</p>
-                <p className="text-xl font-bold">{stats.managers}</p>
+                <p className="text-xs sm:text-sm text-[var(--foreground-tertiary)]">Managers</p>
+                <p className="text-lg sm:text-xl font-bold">{stats.managers}</p>
               </div>
             </div>
           </Card>
           <Card>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center text-white">
-                <Users className="w-5 h-5" />
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-500 rounded-lg flex items-center justify-center text-white">
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div>
-                <p className="text-sm text-[var(--foreground-tertiary)]">Employees</p>
-                <p className="text-xl font-bold">{stats.employees}</p>
+                <p className="text-xs sm:text-sm text-[var(--foreground-tertiary)]">Employees</p>
+                <p className="text-lg sm:text-xl font-bold">{stats.employees}</p>
               </div>
             </div>
           </Card>
         </div>
 
-        {/* Users Table */}
-        <Card padding="none">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        {/* Users Table - Mobile Optimized */}
+        <Card padding="none" className="overflow-hidden">
+          <div className="overflow-x-auto -mx-px">
+            <table className="w-full min-w-[500px]">
               <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">User</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Email</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Role</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Created</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Actions</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">User</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase hidden sm:table-cell">Email</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Role</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase hidden md:table-cell">Created</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -303,31 +303,36 @@ export default function AdminDashboard() {
                 ) : (
                   users.map((user) => (
                     <tr key={user.id} className="hover:bg-[var(--background-secondary)] transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--info)] flex items-center justify-center text-white font-medium text-sm">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--info)] flex items-center justify-center text-white font-medium text-xs sm:text-sm">
                             {user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                           </div>
-                          <span className="font-medium text-[var(--foreground)]">{user.full_name}</span>
+                          <div>
+                            <span className="font-medium text-sm sm:text-base text-[var(--foreground)]">{user.full_name}</span>
+                            <span className="block sm:hidden text-xs text-[var(--foreground-tertiary)]">{user.email}</span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[var(--foreground-secondary)]">{user.email}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-[var(--foreground-secondary)] hidden sm:table-cell">{user.email}</td>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
                         <Badge variant={roleBadgeVariant[user.role]}>
-                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          <span className="hidden sm:inline">{user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span>
+                          <span className="sm:hidden">{user.role.slice(0, 3)}</span>
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[var(--foreground-secondary)]">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-[var(--foreground-secondary)] hidden md:table-cell">
                         {format(new Date(user.created_at), 'MMM d, yyyy')}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openEditModal(user)}>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
+                          <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openEditModal(user)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
                           <Button 
                             variant="danger" 
                             size="sm" 
+                            className="p-1 sm:p-2"
                             onClick={() => handleDeleteUser(user.id)}
                             disabled={user.id === profile?.id}
                           >

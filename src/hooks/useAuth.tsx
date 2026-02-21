@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
+import { setAuthToken } from '@/lib/api-client';
 import { Profile } from '@/types';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
@@ -57,6 +58,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('[useAuth] Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
+      // Store token for custom API client
+      setAuthToken(session?.access_token || null);
       if (session?.user) {
         await fetchProfile(session.user.id);
       }
@@ -68,6 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         console.log('[useAuth] Auth state change:', event, session?.user?.id);
         setUser(session?.user ?? null);
+        // Store/update token for custom API client
+        setAuthToken(session?.access_token || null);
         if (session?.user) {
           await fetchProfile(session.user.id);
         } else {
@@ -97,6 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     console.log('[useAuth] Signing out...');
+    // Clear custom token first
+    setAuthToken(null);
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('[useAuth] Sign out error:', error.message);

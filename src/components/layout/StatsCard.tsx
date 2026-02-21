@@ -18,14 +18,14 @@ const colorStyles = {
 
 export function StatsCard({ title, value, icon, color }: StatsCardProps) {
   return (
-    <div className="bg-white border border-[var(--border)] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white border border-[var(--border)] rounded-xl p-3 sm:p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-[var(--foreground-tertiary)]">{title}</p>
-          <p className="text-2xl font-bold text-[var(--foreground)] mt-1">{value}</p>
+          <p className="text-xs sm:text-sm text-[var(--foreground-tertiary)]">{title}</p>
+          <p className="text-xl sm:text-2xl font-bold text-[var(--foreground)] mt-1">{value}</p>
         </div>
-        <div className={`w-14 h-14 ${colorStyles[color]} rounded-xl flex items-center justify-center text-white shadow-lg`}>
-          <div className="scale-125">
+        <div className={`w-10 h-10 sm:w-14 sm:h-14 ${colorStyles[color]} rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg`}>
+          <div className="scale-100 sm:scale-125">
             {icon}
           </div>
         </div>

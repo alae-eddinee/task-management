@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks';
 import { Header, StatsCard, OnlineUsers } from '@/components/layout';
 import { Button, Input, Select, Textarea, Modal, Card, Badge } from '@/components/ui';
 import { Task, Profile, TaskPriority, TaskStatus, Comment } from '@/types';
+import { insertNotification } from '@/lib/supabase-queries';
+import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment } from '@/lib/api-client';
 import { 
   ClipboardList, 
   Clock, 
@@ -21,8 +23,6 @@ import {
   Search
 } from 'lucide-react';
 import { format } from 'date-fns';
-
-export const dynamic = 'force-dynamic';
 
 const priorityOptions = [
   { value: 'bombe', label: '🚨 BOMBE (Urgent)' },
@@ -73,6 +73,39 @@ export default function ManagerDashboard() {
   const [assignedTo, setAssignedTo] = useState('');
   const [formLoading, setFormLoading] = useState(false);
 
+  const debounce = useCallback((fn: () => void, delayMs: number) => {
+    let timeoutId: number | undefined;
+    return () => {
+      if (timeoutId) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(fn, delayMs);
+    };
+  }, []);
+
+  useEffect(() => {
+    const onError = (event: ErrorEvent) => {
+      console.error('[diagnostics] window.error:', event.message, event.error);
+    };
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('[diagnostics] unhandledrejection:', event.reason);
+    };
+
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    const { data: authSub } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[diagnostics] auth event:', event, {
+        userId: session?.user?.id,
+        expiresAt: session?.expires_at,
+      });
+    });
+
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+      authSub.subscription.unsubscribe();
+    };
+  }, []);
+
   const fetchData = useCallback(async (isBackgroundRefresh = false) => {
     if (!profile) return;
 
@@ -80,37 +113,22 @@ export default function ManagerDashboard() {
       setLoading(true);
     }
 
-    // Fetch employees
-    const { data: employeesData } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'employee');
-
-    if (employeesData) {
+    try {
+      const employeesData = await apiGetEmployees();
       setEmployees(employeesData as Profile[]);
-    }
 
-    // Fetch tasks (show all for managers/admins)
-    const { data: tasksData, error } = await supabase
-      .from('tasks')
-      .select(`
-        *,
-        assigned_to_name:profiles!tasks_assigned_to_fkey(full_name),
-        created_by_name:profiles!tasks_created_by_fkey(full_name)
-      `)
-      .order('priority', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (!error && tasksData) {
-      setTasks(tasksData.map(t => ({
+      const tasksData = await apiGetTasks();
+      setTasks(tasksData.map((t) => ({
         ...t,
         assigned_to_name: t.assigned_to_name?.full_name,
         created_by_name: t.created_by_name?.full_name,
       })) as Task[]);
-    }
-
-    if (!isBackgroundRefresh) {
-      setLoading(false);
+    } catch (err) {
+      console.error('[fetchData] API error:', err);
+    } finally {
+      if (!isBackgroundRefresh) {
+        setLoading(false);
+      }
     }
   }, [profile]);
 
@@ -126,29 +144,41 @@ export default function ManagerDashboard() {
 
   // Real-time subscription for tasks
   useEffect(() => {
+    if (!profile) return;
+
+    const refresh = debounce(() => fetchData(true), 300);
+
     const channel = supabase
       .channel('manager-tasks')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'tasks',
-        },
-        () => {
-          fetchData(true); // Background refresh - don't show loading spinner
-        }
+        { event: 'INSERT', schema: 'public', table: 'tasks' },
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'tasks' },
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'tasks' },
+        refresh
       )
       .subscribe();
 
     return () => {
       channel.unsubscribe();
     };
-  }, [fetchData]);
+  }, [profile, fetchData, debounce]);
 
-  // Real-time subscription for comments
+  // Real-time subscription for comments (only for the selected task)
   useEffect(() => {
     if (!profile || !selectedTask) return;
+
+    const refresh = debounce(() => {
+      fetchComments(selectedTask.id);
+    }, 300);
 
     const channel = supabase
       .channel(`manager-comments:${selectedTask.id}`)
@@ -160,16 +190,34 @@ export default function ManagerDashboard() {
           table: 'comments',
           filter: `task_id=eq.${selectedTask.id}`,
         },
-        () => {
-          fetchComments(selectedTask.id);
-        }
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'comments',
+          filter: `task_id=eq.${selectedTask.id}`,
+        },
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'comments',
+          filter: `task_id=eq.${selectedTask.id}`,
+        },
+        refresh
       )
       .subscribe();
 
     return () => {
       channel.unsubscribe();
     };
-  }, [profile, selectedTask]);
+  }, [profile, selectedTask, debounce]);
 
   const resetForm = () => {
     setTitle('');
@@ -204,10 +252,23 @@ export default function ManagerDashboard() {
     setFormLoading(true);
 
     try {
+      // Ensure priority is strictly 'bombe' or 'normal' - handle all edge cases
+      let validPriority: 'bombe' | 'normal' = 'normal';
+      
+      console.log('Raw priority state:', priority, 'type:', typeof priority);
+      
+      if (priority === 'bombe') {
+        validPriority = 'bombe';
+      } else {
+        validPriority = 'normal';
+      }
+      
+      console.log('Final priority value:', validPriority, 'type:', typeof validPriority);
+      
       const taskData = {
         title: title.trim(),
         description: description.trim() || null,
-        priority,
+        priority: validPriority as 'bombe' | 'normal',
         due_date: dueDate || null,
         assigned_to: assignedTo,
         created_by: profile.id,
@@ -216,32 +277,21 @@ export default function ManagerDashboard() {
       
       console.log('Inserting task:', taskData);
       
-      // Try insert without select - simpler approach
-      const insertResult = await supabase.from('tasks').insert(taskData);
+      await apiCreateTask(taskData);
       
-      console.log('Insert complete:', insertResult);
-      const { error, data } = insertResult;
+      console.log('Insert successful');
 
-      console.log('Insert result:', { error, data });
+      // Create notification for assigned employee (non-blocking)
+      insertNotification({
+        user_id: assignedTo,
+        title: 'New Task Assigned',
+        message: `You have been assigned a new task: "${title}"`,
+        type: 'task_assigned',
+      }).catch((err) => console.error('Notification error:', err));
 
-      if (error) {
-        console.error('Error creating task:', error);
-        alert('Failed to create task: ' + error.message);
-      } else {
-        // Create notification for assigned employee (non-blocking)
-        supabase.from('notifications').insert({
-          user_id: assignedTo,
-          title: 'New Task Assigned',
-          message: `You have been assigned a new task: "${title}"`,
-          type: 'task_assigned',
-        }).then(({ error: notifError }) => {
-          if (notifError) console.error('Notification error:', notifError);
-        });
-
-        resetForm();
-        setShowCreateModal(false);
-        fetchData();
-      }
+      resetForm();
+      setShowCreateModal(false);
+      fetchData();
     } catch (err) {
       console.error('Exception creating task:', err);
       alert('An error occurred while creating the task');
@@ -256,34 +306,44 @@ export default function ManagerDashboard() {
 
     setFormLoading(true);
 
-    const { error } = await supabase
-      .from('tasks')
-      .update({
-        title: title.trim(),
-        description: description.trim() || null,
-        priority,
-        due_date: dueDate || null,
-        assigned_to: assignedTo || selectedTask.assigned_to,
-      })
-      .eq('id', selectedTask.id);
+    try {
+      // Ensure priority is a valid value
+      const validPriority: TaskPriority = priority === 'bombe' ? 'bombe' : 'normal';
 
-    if (!error) {
-      setShowEditModal(false);
-      setSelectedTask(null);
-      resetForm();
-      fetchData();
+      try {
+        await apiUpdateTask(selectedTask.id, {
+          title: title.trim(),
+          description: description.trim() || null,
+          priority: validPriority,
+          due_date: dueDate || null,
+          assigned_to: assignedTo || selectedTask.assigned_to,
+        });
+
+        setShowEditModal(false);
+        setSelectedTask(null);
+        resetForm();
+        fetchData();
+      } catch (err) {
+        console.error('Error updating task:', err);
+        alert('Failed to update task: ' + (err as Error).message);
+      }
+    } catch (err) {
+      console.error('Exception updating task:', err);
+      alert('An error occurred while updating the task');
+    } finally {
+      setFormLoading(false);
     }
-
-    setFormLoading(false);
   };
 
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return;
 
-    const { error } = await supabase.from('tasks').delete().eq('id', taskId);
-
-    if (!error) {
+    try {
+      await apiDeleteTask(taskId);
       fetchData();
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      alert('Failed to delete task: ' + (err as Error).message);
     }
   };
 
@@ -299,20 +359,14 @@ export default function ManagerDashboard() {
   };
 
   const fetchComments = async (taskId: string) => {
-    const { data } = await supabase
-      .from('comments')
-      .select(`
-        *,
-        user_name:profiles(full_name)
-      `)
-      .eq('task_id', taskId)
-      .order('created_at', { ascending: true });
-
-    if (data) {
-      setComments(data.map(c => ({
+    try {
+      const data = await apiGetComments(taskId);
+      setComments(data.map((c) => ({
         ...c,
         user_name: c.user_name?.full_name || 'Unknown',
       })) as Comment[]);
+    } catch (err) {
+      console.error('[fetchComments] API error:', err);
     }
   };
 
@@ -329,26 +383,17 @@ export default function ManagerDashboard() {
 
     setCommentLoading(true);
 
-    const { error } = await supabase.from('comments').insert({
-      task_id: selectedTask.id,
-      user_id: profile.id,
-      content: newComment.trim(),
-    });
-
-    if (!error) {
-      // Notify assigned employee
-      if (selectedTask.assigned_to !== profile.id) {
-        await supabase.from('notifications').insert({
-          user_id: selectedTask.assigned_to,
-          title: 'New Comment',
-          message: `New comment on task "${selectedTask.title}"`,
-          type: 'comment_added',
-        });
-      }
-
+    try {
+      await apiCreateComment({
+        task_id: selectedTask.id,
+        user_id: profile.id,
+        content: newComment.trim(),
+      });
       setNewComment('');
-      // Refetch comments
       await fetchComments(selectedTask.id);
+    } catch (err) {
+      console.error('Error adding comment:', err);
+      alert('Failed to add comment: ' + (err as Error).message);
     }
 
     setCommentLoading(false);
@@ -382,11 +427,16 @@ export default function ManagerDashboard() {
   const getEmployeeTasks = (employeeId: string) => {
     const employeeTasks = tasks.filter(t => t.assigned_to === employeeId);
     return [...employeeTasks].sort((a, b) => {
-      const aIsBombeActive = a.priority === 'bombe' && a.status !== 'done';
-      const bIsBombeActive = b.priority === 'bombe' && b.status !== 'done';
+      // Done tasks go to the bottom
+      if (a.status === 'done' && b.status !== 'done') return 1;
+      if (b.status === 'done' && a.status !== 'done') return -1;
 
-      if (aIsBombeActive && !bIsBombeActive) return -1;
-      if (bIsBombeActive && !aIsBombeActive) return 1;
+      // Among non-done tasks: BOMBE tasks come first
+      const aIsBombe = a.priority === 'bombe';
+      const bIsBombe = b.priority === 'bombe';
+
+      if (aIsBombe && !bIsBombe) return -1;
+      if (bIsBombe && !aIsBombe) return 1;
 
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
@@ -404,14 +454,17 @@ export default function ManagerDashboard() {
     e.full_name.toLowerCase().includes(employeeSearch.toLowerCase())
   );
 
-  // Sort tasks: BOMBE (not done) first, then by date
   const sortedTasks = [...filteredTasks].sort((a, b) => {
-    // BOMBE tasks that are not done always come first
-    const aIsBombeActive = a.priority === 'bombe' && a.status !== 'done';
-    const bIsBombeActive = b.priority === 'bombe' && b.status !== 'done';
+    // Done tasks go to the bottom
+    if (a.status === 'done' && b.status !== 'done') return 1;
+    if (b.status === 'done' && a.status !== 'done') return -1;
     
-    if (aIsBombeActive && !bIsBombeActive) return -1;
-    if (bIsBombeActive && !aIsBombeActive) return 1;
+    // Among non-done tasks: BOMBE tasks come first
+    const aIsBombe = a.priority === 'bombe';
+    const bIsBombe = b.priority === 'bombe';
+    
+    if (aIsBombe && !bIsBombe) return -1;
+    if (bIsBombe && !aIsBombe) return 1;
     
     // Then sort by created_at (newest first)
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -445,11 +498,11 @@ export default function ManagerDashboard() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatsCard title="Total Tasks" value={stats.total} icon={<ClipboardList className="w-6 h-6" />} color="blue" />
-          <StatsCard title="Active Tasks" value={stats.active} icon={<Clock className="w-6 h-6" />} color="orange" />
-          <StatsCard title="Completed" value={stats.completed} icon={<CheckCircle className="w-6 h-6" />} color="green" />
-          <StatsCard title="Overdue" value={stats.overdue} icon={<AlertTriangle className="w-6 h-6" />} color="red" />
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
+          <StatsCard title="Total" value={stats.total} icon={<ClipboardList className="w-5 h-5 sm:w-6 sm:h-6" />} color="blue" />
+          <StatsCard title="Active" value={stats.active} icon={<Clock className="w-5 h-5 sm:w-6 sm:h-6" />} color="orange" />
+          <StatsCard title="Done" value={stats.completed} icon={<CheckCircle className="w-5 h-5 sm:w-6 sm:h-6" />} color="green" />
+          <StatsCard title="Overdue" value={stats.overdue} icon={<AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6" />} color="red" />
         </div>
 
         {/* Filter */}
@@ -483,18 +536,18 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
-        {/* Tasks Table */}
-        <Card padding="none">
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-            <table className="w-full">
+        {/* Tasks Table - Mobile Optimized */}
+        <Card padding="none" className="overflow-hidden">
+          <div className="overflow-x-auto -mx-px">
+            <table className="w-full min-w-[640px]">
               <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Task</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Assigned To</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Priority</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Due Date</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Actions</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Task</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Assigned</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Priority</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Status</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase hidden sm:table-cell">Due</th>
+                  <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
@@ -506,44 +559,52 @@ export default function ManagerDashboard() {
                   </tr>
                 ) : (
                   sortedTasks.map((task) => (
-                    <tr key={task.id} className={`hover:bg-[var(--background-secondary)] transition-colors ${task.priority === 'bombe' && task.status !== 'done' ? 'bg-red-50 dark:bg-red-900/20' : ''} ${task.status === 'done' ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30' : ''}`}>
-                      <td className="px-4 py-3">
-                        <p className={`font-medium ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
+                    <tr key={task.id} className={`transition-colors cursor-pointer ${
+                      task.status === 'done'
+                        ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                        : task.priority === 'bombe'
+                          ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
+                          : 'hover:bg-[var(--background-secondary)]'
+                    }`}>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
+                        <p className={`font-medium text-sm sm:text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
                         {task.description && (
-                          <p className={`text-sm text-[var(--foreground-tertiary)] truncate max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
+                          <p className={`text-xs sm:text-sm text-[var(--foreground-tertiary)] truncate max-w-[120px] sm:max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
                         )}
                       </td>
-                      <td className={`px-4 py-3 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
+                      <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
                         {task.assigned_to_name || 'Unknown'}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
                         {task.priority === 'bombe' && (
                           <span className={task.status === 'done' ? 'line-through opacity-60' : ''}>
                             <Badge variant="danger">
-                              🚨 BOMBE
+                              <span className="hidden sm:inline">🚨 BOMBE</span>
+                              <span className="sm:hidden">🚨</span>
                             </Badge>
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
                         <Badge variant={statusBadgeVariant[task.status]}>
-                          {task.status === 'in_progress' ? 'In Progress' : task.status === 'todo' ? 'To Do' : 'Done'}
+                          <span className="hidden sm:inline">{task.status === 'in_progress' ? 'In Progress' : task.status === 'todo' ? 'To Do' : 'Done'}</span>
+                          <span className="sm:hidden">{task.status === 'in_progress' ? 'IP' : task.status === 'todo' ? 'TD' : 'DN'}</span>
                         </Badge>
                       </td>
-                      <td className={`px-4 py-3 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
-                        {task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : '-'}
+                      <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-[var(--foreground-secondary)]'}`}>
+                        {task.due_date ? format(new Date(task.due_date), 'MMM d') : '-'}
                       </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => openDetailModal(task)}>
+                      <td className="px-3 sm:px-4 py-2 sm:py-3">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
+                          <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
                             <Eye className="w-4 h-4" />
                           </Button>
                           {task.status !== 'done' && (
                             <>
-                              <Button variant="ghost" size="sm" onClick={() => openEditModal(task)}>
+                              <Button variant="ghost" size="sm" className="p-1 sm:p-2 hidden sm:flex" onClick={() => openEditModal(task)}>
                                 <Pencil className="w-4 h-4" />
                               </Button>
-                              <Button variant="danger" size="sm" onClick={() => handleDeleteTask(task.id)}>
+                              <Button variant="danger" size="sm" className="p-1 sm:p-2" onClick={() => handleDeleteTask(task.id)}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
                             </>
@@ -559,10 +620,10 @@ export default function ManagerDashboard() {
         </Card>
 
         {/* Employee Tracking Section */}
-        <div className="mt-10">
-          <div className="flex items-center gap-2 mb-6">
-            <Users className="w-5 h-5 text-[var(--primary)]" />
-            <h2 className="text-xl font-bold text-[var(--foreground)]">Employee Task Tracking</h2>
+        <div className="mt-8 sm:mt-10">
+          <div className="flex items-center gap-2 mb-4 sm:mb-6">
+            <Users className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--primary)]" />
+            <h2 className="text-lg sm:text-xl font-bold text-[var(--foreground)]">Employee Tracking</h2>
           </div>
 
           {employees.length === 0 ? (
@@ -578,14 +639,14 @@ export default function ManagerDashboard() {
                 return (
                   <Card key={employee.id} padding="none" className="overflow-hidden">
                     {/* Employee Header */}
-                    <div className="px-4 py-3 bg-[var(--background-tertiary)] border-b border-[var(--border)]">
+                    <div className="px-3 sm:px-4 py-2 sm:py-3 bg-[var(--background-tertiary)] border-b border-[var(--border)]">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--info)] flex items-center justify-center text-white font-medium text-sm">
+                          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--info)] flex items-center justify-center text-white font-medium text-xs sm:text-sm">
                             {employee.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                           </div>
                           <div>
-                            <p className="font-semibold text-[var(--foreground)] text-sm">{employee.full_name}</p>
+                            <p className="font-semibold text-[var(--foreground)] text-xs sm:text-sm">{employee.full_name}</p>
                             <p className="text-xs text-[var(--foreground-tertiary)]">{empStats.total} tasks</p>
                           </div>
                         </div>
@@ -593,7 +654,7 @@ export default function ManagerDashboard() {
                           <span className="px-1.5 py-0.5 rounded bg-orange-200 text-orange-900 dark:bg-orange-900/60 dark:text-orange-200">
                             {empStats.todo}
                           </span>
-                          <span className="px-1.5 py-0.5 rounded bg-blue-200 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200">
+                          <span className="px-1.5 py-0.5 rounded bg-blue-200 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200 hidden sm:inline">
                             {empStats.inProgress}
                           </span>
                           <span className="px-1.5 py-0.5 rounded bg-green-200 text-green-900 dark:bg-green-900/60 dark:text-green-200">
@@ -604,41 +665,42 @@ export default function ManagerDashboard() {
                               🚨{empStats.bombe}
                             </span>
                           )}
-                          {empStats.overdue > 0 && (
-                            <span className="px-1.5 py-0.5 rounded bg-red-500 text-white font-bold">
-                              {empStats.overdue}!
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
                     
                     {/* Employee Tasks Table */}
-                    <div className="max-h-64 overflow-y-auto">
+                    <div className="max-h-48 sm:max-h-64 overflow-y-auto">
                       <table className="w-full">
                         <tbody className="divide-y divide-[var(--border)]">
                           {empTasks.length === 0 ? (
                             <tr>
-                              <td className="px-4 py-4 text-center text-[var(--foreground-tertiary)] text-sm">
-                                No tasks assigned
+                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-center text-[var(--foreground-tertiary)] text-xs sm:text-sm">
+                                No tasks
                               </td>
                             </tr>
                           ) : (
                             empTasks.map((task) => (
-                              <tr key={task.id} className={`hover:bg-[var(--background-secondary)] ${task.priority === 'bombe' && task.status !== 'done' ? 'bg-red-50 dark:bg-red-900/10' : ''} ${task.status === 'done' ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30' : ''}`}>
-                                <td className="px-3 py-2">
-                                  <p className={`text-sm truncate max-w-[180px] ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>{task.title}</p>
+                              <tr key={task.id} className={`transition-colors cursor-pointer ${
+                                task.status === 'done'
+                                  ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                                  : task.priority === 'bombe'
+                                    ? 'bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/20'
+                                    : 'hover:bg-[var(--background-secondary)]'
+                              }`}>
+                                <td className="px-2 sm:px-3 py-1.5 sm:py-2">
+                                  <p className={`text-xs sm:text-sm truncate max-w-[140px] sm:max-w-[180px] ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>{task.title}</p>
                                 </td>
-                                <td className="px-2 py-2">
+                                <td className="px-1 sm:px-2 py-1.5 sm:py-2">
                                   <span className={task.status === 'done' ? 'opacity-60' : ''}>
                                     <Badge variant={priorityBadgeVariant[task.priority]}>
                                       {task.priority === 'bombe' ? '🚨' : task.priority.charAt(0).toUpperCase()}
                                     </Badge>
                                   </span>
                                 </td>
-                                <td className="px-2 py-2 text-right">
-                                  <Button variant="ghost" size="sm" onClick={() => openDetailModal(task)}>
-                                    <Eye className="w-4 h-4" />
+                                <td className="px-1 sm:px-2 py-1.5 sm:py-2 text-right">
+                                  <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
+                                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                   </Button>
                                 </td>
                               </tr>

@@ -1,6 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+function applySetCookie(from: NextResponse, to: NextResponse) {
+  const setCookie = from.headers.get('set-cookie');
+  if (setCookie) {
+    to.headers.set('set-cookie', setCookie);
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -17,29 +24,29 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
   );
 
-  // Get the current session
+  // IMPORTANT: Use getUser() instead of getSession() to properly refresh expired tokens
+  // getSession() only reads cookies without refreshing, causing auth failures after token expiry
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   // Public routes - redirect to appropriate dashboard if already logged in
   if (pathname === '/' || pathname === '/login') {
-    if (session) {
+    if (user) {
       // Fetch profile to determine redirect
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
-        .eq('id', session.user.id)
+        .eq('id', user.id)
         .single();
 
       const redirectPath = profile?.role === 'admin' 
@@ -48,14 +55,18 @@ export async function middleware(request: NextRequest) {
           ? '/manager' 
           : '/employee';
 
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      const redirectResponse = NextResponse.redirect(new URL(redirectPath, request.url));
+      applySetCookie(response, redirectResponse);
+      return redirectResponse;
     }
     return response;
   }
 
   // Protected routes - require authentication
-  if (!session) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  if (!user) {
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url));
+    applySetCookie(response, redirectResponse);
+    return redirectResponse;
   }
 
   return response;
