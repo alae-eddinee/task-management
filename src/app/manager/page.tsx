@@ -607,15 +607,13 @@ export default function ManagerDashboard() {
                                 <Eye className="w-4 h-4" />
                               </Button>
                               {task.status !== 'done' && (
-                                <>
-                                  <Button variant="ghost" size="sm" className="p-2" onClick={() => openEditModal(task)}>
-                                    <Pencil className="w-4 h-4" />
-                                  </Button>
-                                  <Button variant="danger" size="sm" className="p-2" onClick={() => handleDeleteTask(task.id)}>
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </>
+                                <Button variant="ghost" size="sm" className="p-2" onClick={() => openEditModal(task)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
                               )}
+                              <Button variant="danger" size="sm" className="p-2" onClick={() => handleDeleteTask(task.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -687,15 +685,13 @@ export default function ManagerDashboard() {
                           <Eye className="w-4 h-4" />
                         </Button>
                         {task.status !== 'done' && (
-                          <>
-                            <Button variant="ghost" size="sm" className="p-1" onClick={() => openEditModal(task)}>
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button variant="danger" size="sm" className="p-1" onClick={() => handleDeleteTask(task.id)}>
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </>
+                          <Button variant="ghost" size="sm" className="p-1" onClick={() => openEditModal(task)}>
+                            <Pencil className="w-4 h-4" />
+                          </Button>
                         )}
+                        <Button variant="danger" size="sm" className="p-1" onClick={() => handleDeleteTask(task.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>
