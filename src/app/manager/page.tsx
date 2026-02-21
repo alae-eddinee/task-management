@@ -281,13 +281,13 @@ export default function ManagerDashboard() {
       
       console.log('Insert successful');
 
-      // Create notification for assigned employee (non-blocking)
-      insertNotification({
-        user_id: assignedTo,
-        title: 'New Task Assigned',
-        message: `You have been assigned a new task: "${title}"`,
-        type: 'task_assigned',
-      }).catch((err) => console.error('Notification error:', err));
+      // Notification disabled - notifications table may be missing or blocked by RLS
+      // insertNotification({
+      //   user_id: assignedTo,
+      //   title: 'New Task Assigned',
+      //   message: `You have been assigned a new task: "${title}"`,
+      //   type: 'task_assigned',
+      // }).catch((err) => console.error('Notification error:', err));
 
       resetForm();
       setShowCreateModal(false);
@@ -338,11 +338,17 @@ export default function ManagerDashboard() {
   const handleDeleteTask = async (taskId: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return;
 
+    const taskToDelete = tasks.find(t => t.id === taskId);
+    if (!taskToDelete) return;
+
+    console.log('[handleDeleteTask] Deleting task:', taskId, 'Title:', taskToDelete.title);
+
     try {
       await apiDeleteTask(taskId);
+      console.log('[handleDeleteTask] Delete successful');
       fetchData();
     } catch (err) {
-      console.error('Error deleting task:', err);
+      console.error('[handleDeleteTask] Error deleting task:', err);
       alert('Failed to delete task: ' + (err as Error).message);
     }
   };
@@ -536,11 +542,11 @@ export default function ManagerDashboard() {
           </div>
         </div>
 
-        {/* Tasks Table - Mobile Optimized */}
+        {/* Tasks Table - Mobile Optimized with Scroll (10 tasks visible) */}
         <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto -mx-px">
             <table className="w-full min-w-[640px]">
-              <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)]">
+              <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)] sticky top-0 z-10">
                 <tr>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Task</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Assigned</th>
@@ -550,72 +556,76 @@ export default function ManagerDashboard() {
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {sortedTasks.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
-                      No tasks found. Create your first task!
-                    </td>
-                  </tr>
-                ) : (
-                  sortedTasks.map((task) => (
-                    <tr key={task.id} className={`transition-colors cursor-pointer ${
-                      task.status === 'done'
-                        ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
-                        : task.priority === 'bombe'
-                          ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
-                          : 'hover:bg-[var(--background-secondary)]'
-                    }`}>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <p className={`font-medium text-sm sm:text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
-                        {task.description && (
-                          <p className={`text-xs sm:text-sm text-[var(--foreground-tertiary)] truncate max-w-[120px] sm:max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
-                        )}
-                      </td>
-                      <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
-                        {task.assigned_to_name || 'Unknown'}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        {task.priority === 'bombe' && (
-                          <span className={task.status === 'done' ? 'line-through opacity-60' : ''}>
-                            <Badge variant="danger">
-                              <span className="hidden sm:inline">🚨 BOMBE</span>
-                              <span className="sm:hidden">🚨</span>
-                            </Badge>
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <Badge variant={statusBadgeVariant[task.status]}>
-                          <span className="hidden sm:inline">{task.status === 'in_progress' ? 'In Progress' : task.status === 'todo' ? 'To Do' : 'Done'}</span>
-                          <span className="sm:hidden">{task.status === 'in_progress' ? 'IP' : task.status === 'todo' ? 'TD' : 'DN'}</span>
-                        </Badge>
-                      </td>
-                      <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-[var(--foreground-secondary)]'}`}>
-                        {task.due_date ? format(new Date(task.due_date), 'MMM d') : '-'}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <div className="flex items-center justify-end gap-1 sm:gap-2">
-                          <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {task.status !== 'done' && (
-                            <>
-                              <Button variant="ghost" size="sm" className="p-1 sm:p-2 hidden sm:flex" onClick={() => openEditModal(task)}>
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button variant="danger" size="sm" className="p-1 sm:p-2" onClick={() => handleDeleteTask(task.id)}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+            </table>
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full min-w-[640px]">
+                <tbody className="divide-y divide-[var(--border)]">
+                  {sortedTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
+                        No tasks found. Create your first task!
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    sortedTasks.map((task) => (
+                      <tr key={task.id} className={`transition-colors cursor-pointer ${
+                        task.status === 'done'
+                          ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                          : task.priority === 'bombe'
+                            ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
+                            : 'hover:bg-[var(--background-secondary)]'
+                      }`}>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          <p className={`font-medium text-sm sm:text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
+                          {task.description && (
+                            <p className={`text-xs sm:text-sm text-[var(--foreground-tertiary)] truncate max-w-[120px] sm:max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
+                          )}
+                        </td>
+                        <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
+                          {task.assigned_to_name || 'Unknown'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          {task.priority === 'bombe' && (
+                            <span className={task.status === 'done' ? 'line-through opacity-60' : ''}>
+                              <Badge variant="danger">
+                                <span className="hidden sm:inline">🚨 BOMBE</span>
+                                <span className="sm:hidden">🚨</span>
+                              </Badge>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          <Badge variant={statusBadgeVariant[task.status]}>
+                            <span className="hidden sm:inline">{task.status === 'in_progress' ? 'In Progress' : task.status === 'todo' ? 'To Do' : 'Done'}</span>
+                            <span className="sm:hidden">{task.status === 'in_progress' ? 'IP' : task.status === 'todo' ? 'TD' : 'DN'}</span>
+                          </Badge>
+                        </td>
+                        <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-[var(--foreground-secondary)]'}`}>
+                          {task.due_date ? format(new Date(task.due_date), 'MMM d') : '-'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          <div className="flex items-center justify-end gap-1 sm:gap-2">
+                            <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            {task.status !== 'done' && (
+                              <>
+                                <Button variant="ghost" size="sm" className="p-1 sm:p-2 hidden sm:flex" onClick={() => openEditModal(task)}>
+                                  <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button variant="danger" size="sm" className="p-1 sm:p-2" onClick={() => handleDeleteTask(task.id)}>
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Card>
 

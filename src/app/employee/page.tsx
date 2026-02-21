@@ -123,14 +123,20 @@ export default function EmployeeDashboard() {
         { event: '*', schema: 'public', table: 'tasks' },
         (payload) => {
           console.log('[Realtime] Task event received:', payload.eventType, payload);
-          // For DELETE events, the old record has the assigned_to
-          // For INSERT/UPDATE, check the new record
-          const taskData = payload.new || payload.old;
-          const assignedTo = taskData?.assigned_to;
           
+          // For DELETE events, we can't verify assigned_to (it's in old record but may be incomplete)
+          // So we always refresh on DELETE to ensure deleted tasks are removed
+          if (payload.eventType === 'DELETE') {
+            console.log('[Realtime] DELETE event - refreshing tasks');
+            refresh();
+            return;
+          }
+          
+          // For INSERT/UPDATE, check the new record's assigned_to
+          const assignedTo = payload.new?.assigned_to;
           console.log('[Realtime] Task assigned_to:', assignedTo, 'Current user:', profile.id);
           
-          // Only refresh if this task was assigned to current user
+          // Only refresh if this task is assigned to current user
           if (assignedTo === profile.id) {
             console.log('[Realtime] Refreshing tasks for current user');
             refresh();
@@ -191,26 +197,26 @@ export default function EmployeeDashboard() {
     try {
       await apiUpdateTask(taskId, { status: newStatus });
 
-      // Notify manager (best-effort)
-      if (newStatus === 'done') {
-        supabase.from('notifications').insert({
-          user_id: prevTask.created_by,
-          title: 'Task Completed',
-          message: `Task "${prevTask.title}" has been marked as complete`,
-          type: 'task_completed',
-        }).then(({ error: notifError }) => {
-          if (notifError) console.error('Notification error:', notifError);
-        });
-      } else {
-        supabase.from('notifications').insert({
-          user_id: prevTask.created_by,
-          title: 'Task Status Updated',
-          message: `Task "${prevTask.title}" status changed to ${newStatus.replace('_', ' ')}`,
-          type: 'status_updated',
-        }).then(({ error: notifError }) => {
-          if (notifError) console.error('Notification error:', notifError);
-        });
-      }
+      // Notify manager (best-effort) - DISABLED due to notification timeout issues
+      // if (newStatus === 'done') {
+      //   supabase.from('notifications').insert({
+      //     user_id: prevTask.created_by,
+      //     title: 'Task Completed',
+      //     message: `Task "${prevTask.title}" has been marked as complete`,
+      //     type: 'task_completed',
+      //   }).then(({ error: notifError }) => {
+      //     if (notifError) console.error('Notification error:', notifError);
+      //   });
+      // } else {
+      //   supabase.from('notifications').insert({
+      //     user_id: prevTask.created_by,
+      //     title: 'Task Status Updated',
+      //     message: `Task "${prevTask.title}" status changed to ${newStatus.replace('_', ' ')}`,
+      //     type: 'status_updated',
+      //   }).then(({ error: notifError }) => {
+      //     if (notifError) console.error('Notification error:', notifError);
+      //   });
+      // }
     } catch (err) {
       // Rollback
       setTasks((prev) => prev.map((t) => (t.id === taskId ? prevTask : t)));
@@ -282,13 +288,13 @@ export default function EmployeeDashboard() {
         content: newComment.trim(),
       });
 
-      // Notify manager
-      await supabase.from('notifications').insert({
-        user_id: selectedTask.created_by,
-        title: 'New Comment',
-        message: `New comment on task "${selectedTask.title}"`,
-        type: 'comment_added',
-      });
+      // Notify manager - DISABLED due to notification timeout issues
+      // await supabase.from('notifications').insert({
+      //   user_id: selectedTask.created_by,
+      //   title: 'New Comment',
+      //   message: `New comment on task "${selectedTask.title}"`,
+      //   type: 'comment_added',
+      // });
 
       setNewComment('');
       await fetchComments(selectedTask.id);
@@ -376,11 +382,11 @@ export default function EmployeeDashboard() {
           ))}
         </div>
 
-        {/* Tasks Table - Mobile Optimized */}
+        {/* Tasks Table - Mobile Optimized with Scroll (10 tasks visible) */}
         <Card padding="none" className="overflow-hidden">
           <div className="overflow-x-auto -mx-px">
             <table className="w-full min-w-[500px]">
-              <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)]">
+              <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)] sticky top-0 z-10">
                 <tr>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Task</th>
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Status</th>
@@ -389,86 +395,90 @@ export default function EmployeeDashboard() {
                   <th className="px-3 sm:px-4 py-2 sm:py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">View</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[var(--border)]">
-                {sortedTasks.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
-                      No tasks assigned to you yet.
-                    </td>
-                  </tr>
-                ) : (
-                  sortedTasks.map((task) => (
-                    <tr key={task.id} className={`transition-colors cursor-pointer ${
-                      task.status === 'done'
-                        ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
-                        : task.priority === 'bombe'
-                          ? 'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800'
-                          : 'hover:bg-[var(--background-secondary)]'
-                    }`}>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <p className={`font-medium text-sm sm:text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
-                        {task.description && (
-                          <p className={`text-xs sm:text-sm truncate max-w-[140px] sm:max-w-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
-                        )}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <select
-                          value={task.status}
-                          onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
-                          disabled={mutatingTaskIds.has(task.id)}
-                          className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium border cursor-pointer focus:ring-2 focus:ring-[var(--primary)] max-w-[90px] sm:max-w-none ${
-                            task.priority === 'bombe' && task.status !== 'done'
-                              ? 'bg-white/20 text-white border-white/50'
-                              : task.status === 'done' ? 'bg-green-500 text-white dark:bg-green-600 border-transparent' :
-                              task.status === 'todo' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border-transparent' :
-                              'bg-blue-500 text-white dark:bg-blue-600 border-transparent'
-                          }`}
-                        >
-                          {statusOptions.map((opt) => (
-                            <option key={opt.value} value={opt.value} className="bg-white text-gray-900">
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                        {mutatingTaskIds.has(task.id) && (
-                          <span className="inline-block align-middle ml-1 sm:ml-2">
-                            <span className="inline-block animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-current" />
-                          </span>
-                        )}
-                      </td>
-                      <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
-                        {task.due_date ? (
-                          <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-[var(--danger)] font-bold' : 'text-[var(--foreground-secondary)]'}>
-                            {format(new Date(task.due_date), 'MMM d')}
-                          </span>
-                        ) : (
-                          <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'}>-</span>
-                        )}
-                      </td>
-                      <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden md:table-cell ${
-                        task.status === 'done' ? 'text-gray-400 line-through' :
-                        task.priority === 'bombe' ? 'text-white' :
-                        'text-[var(--foreground-secondary)]'
-                      }`}>
-                        {task.created_by_name || 'Unknown'}
-                      </td>
-                      <td className="px-3 sm:px-4 py-2 sm:py-3">
-                        <div className="flex items-center justify-end">
-                          <Button 
-                            variant={task.priority === 'bombe' && task.status !== 'done' ? 'ghost' : 'ghost'} 
-                            size="sm" 
-                            onClick={() => openDetailModal(task)}
-                            className={`p-1 sm:p-2 ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white hover:bg-white/20' : ''}`}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </div>
+            </table>
+            <div className="max-h-[480px] overflow-y-auto">
+              <table className="w-full min-w-[500px]">
+                <tbody className="divide-y divide-[var(--border)]">
+                  {sortedTasks.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
+                        No tasks assigned to you yet.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    sortedTasks.map((task) => (
+                      <tr key={task.id} className={`transition-colors cursor-pointer ${
+                        task.status === 'done'
+                          ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
+                          : task.priority === 'bombe'
+                            ? 'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800'
+                            : 'hover:bg-[var(--background-secondary)]'
+                      }`}>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          <p className={`font-medium text-sm sm:text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
+                          {task.description && (
+                            <p className={`text-xs sm:text-sm truncate max-w-[140px] sm:max-w-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
+                          )}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          <select
+                            value={task.status}
+                            onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                            disabled={mutatingTaskIds.has(task.id)}
+                            className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-md text-xs sm:text-sm font-medium border cursor-pointer focus:ring-2 focus:ring-[var(--primary)] max-w-[90px] sm:max-w-none ${
+                              task.priority === 'bombe' && task.status !== 'done'
+                                ? 'bg-white/20 text-white border-white/50'
+                                : task.status === 'done' ? 'bg-green-500 text-white dark:bg-green-600 border-transparent' :
+                                task.status === 'todo' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border-transparent' :
+                                'bg-blue-500 text-white dark:bg-blue-600 border-transparent'
+                            }`}
+                          >
+                            {statusOptions.map((opt) => (
+                              <option key={opt.value} value={opt.value} className="bg-white text-gray-900">
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                          {mutatingTaskIds.has(task.id) && (
+                            <span className="inline-block align-middle ml-1 sm:ml-2">
+                              <span className="inline-block animate-spin rounded-full h-3 w-3 sm:h-4 sm:w-4 border-b-2 border-current" />
+                            </span>
+                          )}
+                        </td>
+                        <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
+                          {task.due_date ? (
+                            <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-[var(--danger)] font-bold' : 'text-[var(--foreground-secondary)]'}>
+                              {format(new Date(task.due_date), 'MMM d')}
+                            </span>
+                          ) : (
+                            <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'}>-</span>
+                          )}
+                        </td>
+                        <td className={`px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm hidden md:table-cell ${
+                          task.status === 'done' ? 'text-gray-400 line-through' :
+                          task.priority === 'bombe' ? 'text-white' :
+                          'text-[var(--foreground-secondary)]'
+                        }`}>
+                          {task.created_by_name || 'Unknown'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-2 sm:py-3">
+                          <div className="flex items-center justify-end">
+                            <Button 
+                              variant={task.priority === 'bombe' && task.status !== 'done' ? 'ghost' : 'ghost'} 
+                              size="sm" 
+                              onClick={() => openDetailModal(task)}
+                              className={`p-1 sm:p-2 ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white hover:bg-white/20' : ''}`}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </Card>
       </main>
