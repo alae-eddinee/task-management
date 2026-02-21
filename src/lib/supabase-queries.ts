@@ -70,7 +70,7 @@ export async function insertNotification(data: {
   const client = createFreshClient();
   return withTimeout(
     client.from('notifications').insert(data),
-    3000,
+    8000,
     'insertNotification'
   );
 }
