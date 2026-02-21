@@ -110,7 +110,7 @@ export default function EmployeeDashboard() {
     }
   }, [profile, authLoading, router, fetchTasks]);
 
-  // Real-time subscription for tasks
+  // Real-time subscription for tasks - listen to all tasks to catch deletions/reassignments
   useEffect(() => {
     if (!profile) return;
 
@@ -120,8 +120,18 @@ export default function EmployeeDashboard() {
       .channel(`employee-tasks:${profile.id}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks', filter: `assigned_to=eq.${profile.id}` },
-        refresh
+        { event: '*', schema: 'public', table: 'tasks' },
+        (payload) => {
+          // For DELETE events, the old record has the assigned_to
+          // For INSERT/UPDATE, check the new record
+          const taskData = payload.new || payload.old;
+          const assignedTo = taskData?.assigned_to;
+          
+          // Only refresh if this task was assigned to current user
+          if (assignedTo === profile.id) {
+            refresh();
+          }
+        }
       )
       .subscribe();
 
