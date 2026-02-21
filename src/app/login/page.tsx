@@ -52,8 +52,17 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--background)] via-[var(--background-secondary)] to-[var(--background-accent)] p-4">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[var(--primary)]/20 via-[var(--background)] to-[var(--info)]/20" />
+      
+      {/* Animated background shapes */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-[var(--primary)]/10 to-transparent rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-[var(--info)]/10 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      </div>
+
+      <Card className="w-full max-w-md relative z-10">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-[var(--primary)] to-[var(--info)] bg-clip-text text-transparent">
             Task Tracker
@@ -88,13 +97,6 @@ export default function LoginPage() {
             Login
           </Button>
         </form>
-
-        <div className="mt-6 p-4 bg-[var(--background-tertiary)] rounded-lg">
-          <p className="text-xs text-[var(--foreground-tertiary)] text-center">
-            <strong>Users are created via Supabase Auth.</strong><br />
-            Admins can create users from the Admin Dashboard, or use Supabase Dashboard → Authentication → Users.
-          </p>
-        </div>
       </Card>
     </div>
   );
