@@ -27,7 +27,8 @@ CREATE TABLE tasks (
   assigned_to UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES profiles(id) ON DELETE SET NULL
 );
 
 -- Comments table
@@ -142,6 +143,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger to set updated_by on task updates
+CREATE OR REPLACE FUNCTION update_updated_by_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_by = auth.uid();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 CREATE TRIGGER update_profiles_updated_at
   BEFORE UPDATE ON profiles
   FOR EACH ROW
@@ -151,6 +161,11 @@ CREATE TRIGGER update_tasks_updated_at
   BEFORE UPDATE ON tasks
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_tasks_updated_by
+  BEFORE UPDATE ON tasks
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_by_column();
 
 -- ============================================
 -- STEP 5: Enable Realtime

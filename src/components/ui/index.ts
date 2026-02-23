@@ -5,3 +5,5 @@ export { Textarea } from './Textarea';
 export { Modal } from './Modal';
 export { Card } from './Card';
 export { Badge } from './Badge';
+export { TaskToastNotifications } from './TaskToastNotifications';
+export { BlueDotIndicator, BlueDotBadge } from './BlueDotIndicator';

@@ -128,3 +128,11 @@ export async function apiCreateComment(data: { task_id: string; user_id: string;
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   return res.status === 201 ? await res.json().catch(() => null) : null;
 }
+
+export async function apiDeleteComment(id: string) {
+  const res = await apiFetch(`/comments?id=eq.${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  return res.status === 204 ? null : await res.json().catch(() => null);
+}

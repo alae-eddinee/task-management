@@ -27,6 +27,7 @@ export interface Task {
   created_by_name?: string;
   created_at: string;
   updated_at: string;
+  updated_by?: string;
 }
 
 export interface Comment {

@@ -1,16 +1,16 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/hooks';
+import { useAuth, useTaskNotifications } from '@/hooks';
 import { Header, StatsCard, OnlineUsers } from '@/components/layout';
 import { Button, Input, Select, Textarea, Modal, Card, Badge } from '@/components/ui';
+import { TaskNotificationProvider, TaskNotificationType } from '@/hooks/useTaskNotifications';
+import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
 import { Task, Profile, TaskPriority, TaskStatus, Comment } from '@/types';
 import { insertNotification } from '@/lib/supabase-queries';
-import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment } from '@/lib/api-client';
+import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment, apiDeleteComment } from '@/lib/api-client';
 import { 
   ClipboardList, 
   Clock, 
@@ -49,7 +49,16 @@ const statusBadgeVariant: Record<TaskStatus, 'secondary' | 'primary' | 'success'
 };
 
 export default function ManagerDashboard() {
+  return (
+    <TaskNotificationProvider>
+      <ManagerDashboardInner />
+    </TaskNotificationProvider>
+  );
+}
+
+function ManagerDashboardInner() {
   const { profile, loading: authLoading } = useAuth();
+  const { addNotification, markTaskAsRead, notifications, clearNotification } = useTaskNotifications();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [employees, setEmployees] = useState<Profile[]>([]);
@@ -117,6 +126,12 @@ export default function ManagerDashboard() {
       setLoading(true);
     }
 
+    // Timeout failsafe - ensure loading always completes
+    const timeoutId = setTimeout(() => {
+      console.warn('[fetchData] Timeout reached, forcing loading to false');
+      setLoading(false);
+    }, 15000);
+
     try {
       const employeesData = await apiGetEmployees();
       setEmployees(employeesData as Profile[]);
@@ -130,6 +145,7 @@ export default function ManagerDashboard() {
     } catch (err) {
       console.error('[fetchData] API error:', err);
     } finally {
+      clearTimeout(timeoutId);
       if (!isBackgroundRefresh) {
         setLoading(false);
       }
@@ -146,7 +162,7 @@ export default function ManagerDashboard() {
     }
   }, [profile, authLoading, router, fetchData]);
 
-  // Real-time subscription for tasks
+  // Real-time subscription for tasks with notifications
   useEffect(() => {
     if (!profile) return;
 
@@ -157,71 +173,169 @@ export default function ManagerDashboard() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'tasks' },
-        refresh
+        (payload) => {
+          const newTask = payload.new as Task;
+          // Manager created the task - DON'T notify manager, employee will get it via their subscription
+          // Only refresh the task list for the manager
+          refresh();
+        }
       )
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tasks' },
-        refresh
+        (payload) => {
+          const updatedTask = payload.new as Task;
+          const oldTask = payload.old as Task;
+          
+          // Only notify if change was made by someone else
+          if (updatedTask.updated_by !== profile.id && updatedTask.updated_by) {
+            // Build detailed change messages
+            const changes: string[] = [];
+            
+            if (oldTask.status !== updatedTask.status) {
+              changes.push(`status changed to "${updatedTask.status}"`);
+            }
+            if (oldTask.priority !== updatedTask.priority) {
+              changes.push(`priority changed to "${updatedTask.priority}"`);
+            }
+            if (oldTask.title !== updatedTask.title) {
+              changes.push(`title updated`);
+            }
+            if (oldTask.description !== updatedTask.description) {
+              changes.push(`description updated`);
+            }
+            if (oldTask.due_date !== updatedTask.due_date) {
+              if (updatedTask.due_date) {
+                changes.push(`due date set to ${format(new Date(updatedTask.due_date), 'MMM d, yyyy')}`);
+              } else {
+                changes.push(`due date removed`);
+              }
+            }
+            if (oldTask.assigned_to !== updatedTask.assigned_to) {
+              changes.push(`reassigned to ${updatedTask.assigned_to_name || 'someone else'}`);
+            }
+            
+            // Create a single notification with all changes
+            let type: TaskNotificationType = 'task_updated';
+            let message: string;
+            
+            if (changes.length === 0) {
+              message = 'Task has been updated';
+            } else if (changes.length === 1) {
+              message = changes[0].charAt(0).toUpperCase() + changes[0].slice(1);
+              if (oldTask.status !== updatedTask.status) {
+                type = 'status_changed';
+              }
+            } else {
+              message = `Multiple changes: ${changes.join(', ')}`;
+            }
+            
+            addNotification({
+              taskId: updatedTask.id,
+              taskTitle: updatedTask.title,
+              type,
+              message,
+              read: false,
+            });
+          }
+          refresh();
+        }
       )
       .on(
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'tasks' },
-        refresh
+        (payload) => {
+          // Just refresh the task list - employee gets notified via their own subscription
+          refresh();
+        }
       )
       .subscribe();
 
     return () => {
       channel.unsubscribe();
     };
-  }, [profile, fetchData, debounce]);
+  }, [profile, fetchData, debounce, addNotification]);
 
-  // Real-time subscription for comments (only for the selected task)
+  // Real-time subscription for comments with notifications
   useEffect(() => {
-    if (!profile || !selectedTask) return;
+    if (!profile) return;
 
-    const refresh = debounce(() => {
-      fetchComments(selectedTask.id);
-    }, 300);
+    console.log('[Realtime] Setting up comments subscription for manager:', profile.id);
 
-    const channel = supabase
-      .channel(`manager-comments:${selectedTask.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'comments',
-          filter: `task_id=eq.${selectedTask.id}`,
-        },
-        refresh
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'comments',
-          filter: `task_id=eq.${selectedTask.id}`,
-        },
-        refresh
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'comments',
-          filter: `task_id=eq.${selectedTask.id}`,
-        },
-        refresh
-      )
-      .subscribe();
+    let retryCount = 0;
+    const maxRetries = 3;
+    let isActive = true;
+
+    const setupSubscription = () => {
+      if (!isActive) return;
+      
+      // Use unique channel name to avoid conflicts
+      const channelName = `comments-ins-${profile.id}-${Date.now()}`;
+      console.log('[Realtime] Creating channel:', channelName);
+      
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'comments',
+          },
+          async (payload) => {
+            console.log('[Realtime] Comment INSERT received:', payload);
+            const newComment = payload.new as Comment;
+            
+            // Only notify if comment is from someone else (employee)
+            if (newComment.user_id !== profile.id) {
+              const { data: taskData } = await supabase
+                .from('tasks')
+                .select('id, title, created_by')
+                .eq('id', newComment.task_id)
+                .single();
+              
+              if (taskData && taskData.created_by === profile.id) {
+                console.log('[Realtime] ✓ Adding notification');
+                addNotification({
+                  taskId: newComment.task_id,
+                  taskTitle: taskData.title,
+                  type: 'comment_added',
+                  message: 'New comment from employee',
+                  read: false,
+                });
+              }
+            }
+            
+            if (selectedTask?.id === newComment.task_id) {
+              fetchComments(newComment.task_id);
+            }
+          }
+        )
+        .subscribe((status, err) => {
+          console.log('[Realtime] Status:', status, err || '');
+          if (status === 'SUBSCRIBED') {
+            console.log('[Realtime] ✓ ACTIVE');
+            retryCount = 0;
+          } else if ((status === 'CLOSED' || status === 'CHANNEL_ERROR') && isActive) {
+            console.error('[Realtime] ✗ Failed:', status);
+            if (retryCount < maxRetries) {
+              retryCount++;
+              console.log(`[Realtime] Retry ${retryCount}/${maxRetries}...`);
+              setTimeout(setupSubscription, 1000 * retryCount);
+            }
+          }
+        });
+
+      return channel;
+    };
+
+    const channel = setupSubscription();
 
     return () => {
-      channel.unsubscribe();
+      isActive = false;
+      channel?.unsubscribe();
     };
-  }, [profile, selectedTask, debounce]);
+  }, [profile, selectedTask, addNotification]);
 
   const resetForm = () => {
     setTitle('');
@@ -414,10 +528,27 @@ export default function ManagerDashboard() {
 
   const openDetailModal = async (task: Task) => {
     setSelectedTask(task);
-    setComments([]); // Clear previous comments before fetching new ones
+    setComments([]);
     setShowDetailModal(true);
     await fetchComments(task.id);
   };
+
+  const handleNotificationClick = useCallback((taskId: string) => {
+    console.log('[ManagerDashboard] Notification clicked for task:', taskId);
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      console.log('[ManagerDashboard] Found task, opening detail modal');
+      markTaskAsRead(taskId);
+      openDetailModal(task);
+    } else {
+      console.log('[ManagerDashboard] Task not found in current tasks list');
+    }
+  }, [tasks, markTaskAsRead]);
+
+  // Clear all notifications on mount (fresh start)
+  useEffect(() => {
+    notifications.forEach(n => clearNotification(n.id));
+  }, []);
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -439,6 +570,19 @@ export default function ManagerDashboard() {
     }
 
     setCommentLoading(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+    if (!selectedTask) return;
+
+    try {
+      await apiDeleteComment(commentId);
+      await fetchComments(selectedTask.id);
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      alert('Failed to delete comment: ' + (err as Error).message);
+    }
   };
 
   const getStats = () => {
@@ -524,6 +668,7 @@ export default function ManagerDashboard() {
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
+      <TaskToastNotifications onNotificationClick={handleNotificationClick} />
       <Header user={profile} />
       {profile && <OnlineUsers currentUserId={profile.id} />}
 
@@ -606,23 +751,25 @@ export default function ManagerDashboard() {
                       </tr>
                     ) : (
                       sortedTasks.map((task) => (
-                        <tr key={task.id} className={`transition-colors cursor-pointer ${
+                        <tr key={task.id} className={`transition-colors cursor-pointer relative ${
                           task.status === 'done'
                             ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
                             : task.priority === 'bombe'
                               ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
-                          <td className="px-4 py-3">
-                            <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
-                              {task.title}
-                            </p>
-                            <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
-                              Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
-                            </p>
-                            {task.description && (
-                              <p className={`text-sm text-[var(--foreground-tertiary)] truncate max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
-                            )}
+                          <td className="px-4 py-3 relative">
+                            <div>
+                                <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
+                                  {task.title}
+                                </p>
+                                <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
+                                  Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                                </p>
+                                {task.description && (
+                                  <p className={`text-sm text-[var(--foreground-tertiary)] truncate max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
+                                )}
+                              </div>
                           </td>
                           <td className={`px-4 py-3 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
                             {task.assigned_to_name || 'Unknown'}
@@ -675,7 +822,7 @@ export default function ManagerDashboard() {
                 {sortedTasks.map((task) => (
                   <div 
                     key={task.id} 
-                    className={`p-3 ${
+                    className={`p-3 relative ${
                       task.status === 'done'
                         ? 'opacity-60 bg-gray-50 dark:bg-gray-800/20'
                         : task.priority === 'bombe'
@@ -1095,9 +1242,19 @@ export default function ManagerDashboard() {
                     <div key={comment.id} className="bg-[var(--background-tertiary)] rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">{comment.user_name}</span>
-                        <span className="text-xs text-[var(--foreground-muted)]">
-                          {format(new Date(comment.created_at), 'MMM d, h:mm a')}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--foreground-muted)]">
+                            {format(new Date(comment.created_at), 'MMM d, h:mm a')}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="p-1 text-[var(--danger)] hover:bg-[var(--danger)]/10"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                       <p className="text-sm text-[var(--foreground-secondary)]">{comment.content}</p>
                     </div>

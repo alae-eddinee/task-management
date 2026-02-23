@@ -1,15 +1,15 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/hooks';
+import { useAuth, useTaskNotifications } from '@/hooks';
 import { Header, StatsCard } from '@/components/layout';
 import { Button, Card, Badge, Modal, Textarea } from '@/components/ui';
+import { TaskNotificationProvider, type TaskNotificationType } from '@/hooks/useTaskNotifications';
+import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
 import type { Task, TaskStatus, Comment } from '@/types';
-import { apiGetTasks, apiUpdateTask, apiGetComments, apiCreateComment } from '@/lib/api-client';
+import { apiGetTasks, apiUpdateTask, apiGetComments, apiCreateComment, apiDeleteComment } from '@/lib/api-client';
 import { 
   ClipboardList, 
   Clock, 
@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   Eye,
   Play,
-  CheckCheck
+  CheckCheck,
+  Trash2
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -34,7 +35,16 @@ const statusBadgeVariant: Record<TaskStatus, 'secondary' | 'primary' | 'success'
 };
 
 export default function EmployeeDashboard() {
+  return (
+    <TaskNotificationProvider>
+      <EmployeeDashboardInner />
+    </TaskNotificationProvider>
+  );
+}
+
+function EmployeeDashboardInner() {
   const { profile, loading: authLoading } = useAuth();
+  const { addNotification, markTaskAsRead, notifications, clearNotification } = useTaskNotifications();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +80,12 @@ export default function EmployeeDashboard() {
       setLoading(true);
     }
 
+    // Timeout failsafe - ensure loading always completes
+    const timeoutId = setTimeout(() => {
+      console.warn('[fetchTasks] Timeout reached, forcing loading to false');
+      setLoading(false);
+    }, 15000);
+
     try {
       const data = await apiGetTasks();
       // Filter tasks assigned to current employee
@@ -92,6 +108,7 @@ export default function EmployeeDashboard() {
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
     } finally {
+      clearTimeout(timeoutId);
       if (!isBackgroundRefresh) {
         setLoading(false);
       }
@@ -115,7 +132,7 @@ export default function EmployeeDashboard() {
     }
   }, [profile, authLoading, router, fetchTasks]);
 
-  // Real-time subscription for tasks - listen to all tasks to catch deletions/reassignments
+  // Real-time subscription for tasks with notifications
   useEffect(() => {
     if (!profile) return;
 
@@ -126,13 +143,40 @@ export default function EmployeeDashboard() {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'tasks' },
-        (payload) => {
+        async (payload) => {
           console.log('[Realtime] Task event received:', payload.eventType, payload);
           
-          // For DELETE events, we can't verify assigned_to (it's in old record but may be incomplete)
-          // So we always refresh on DELETE to ensure deleted tasks are removed
+          // For DELETE events, check if the deleted task was assigned to current user
           if (payload.eventType === 'DELETE') {
-            console.log('[Realtime] DELETE event - refreshing tasks');
+            const deletedTask = payload.old as Task;
+            let assignedTo = deletedTask?.assigned_to;
+            let taskTitle = deletedTask?.title || 'Unknown Task';
+            let taskId = deletedTask?.id;
+            
+            // If payload is incomplete, check local tasks array
+            if (!assignedTo && taskId) {
+              const localTask = tasks.find(t => t.id === taskId);
+              if (localTask) {
+                assignedTo = localTask.assigned_to;
+                taskTitle = localTask.title;
+                console.log('[Realtime] DELETE - Found task in local state:', localTask);
+              }
+            }
+            
+            console.log('[Realtime] DELETE event - assigned_to:', assignedTo, 'profile.id:', profile.id);
+            
+            if (assignedTo === profile.id) {
+              console.log('[Realtime] DELETE - Adding notification for employee');
+              addNotification({
+                taskId: taskId || 'unknown',
+                taskTitle: taskTitle,
+                type: 'task_updated',
+                message: 'Task has been deleted by manager',
+                read: false,
+              });
+            } else {
+              console.log('[Realtime] DELETE - Not notifying: not assigned to this user');
+            }
             refresh();
             return;
           }
@@ -144,6 +188,77 @@ export default function EmployeeDashboard() {
           // Only refresh if this task is assigned to current user
           if (assignedTo === profile.id) {
             console.log('[Realtime] Refreshing tasks for current user');
+            
+            // Show notification for new tasks (only if created by someone else - manager)
+            if (payload.eventType === 'INSERT') {
+              const newTask = payload.new as Task;
+              // Only notify if created by someone else (manager)
+              if (newTask.created_by !== profile.id) {
+                addNotification({
+                  taskId: newTask.id,
+                  taskTitle: newTask.title,
+                  type: 'task_created',
+                  message: 'New task assigned to you',
+                  read: false,
+                });
+              }
+            }
+            
+            // Show notification for updates (only if updated by someone else - manager)
+            if (payload.eventType === 'UPDATE') {
+              const updatedTask = payload.new as Task;
+              const oldTask = payload.old as Task;
+              
+              // Only notify if manager updated it, not self
+              if (updatedTask.updated_by !== profile.id && updatedTask.updated_by) {
+                // Build detailed change messages
+                const changes: string[] = [];
+                
+                if (oldTask.status !== updatedTask.status) {
+                  changes.push(`status changed to "${updatedTask.status}"`);
+                }
+                if (oldTask.priority !== updatedTask.priority) {
+                  changes.push(`priority changed to "${updatedTask.priority}"`);
+                }
+                if (oldTask.title !== updatedTask.title) {
+                  changes.push(`title updated`);
+                }
+                if (oldTask.description !== updatedTask.description) {
+                  changes.push(`description updated`);
+                }
+                if (oldTask.due_date !== updatedTask.due_date) {
+                  if (updatedTask.due_date) {
+                    changes.push(`due date set to ${format(new Date(updatedTask.due_date), 'MMM d, yyyy')}`);
+                  } else {
+                    changes.push(`due date removed`);
+                  }
+                }
+                
+                // Create a single notification with all changes
+                let type: TaskNotificationType = 'task_updated';
+                let message: string;
+                
+                if (changes.length === 0) {
+                  message = 'Task has been updated by manager';
+                } else if (changes.length === 1) {
+                  message = changes[0].charAt(0).toUpperCase() + changes[0].slice(1);
+                  if (oldTask.status !== updatedTask.status) {
+                    type = 'status_changed';
+                  }
+                } else {
+                  message = `Multiple changes: ${changes.join(', ')}`;
+                }
+                
+                addNotification({
+                  taskId: updatedTask.id,
+                  taskTitle: updatedTask.title,
+                  type,
+                  message,
+                  read: false,
+                });
+              }
+            }
+            
             refresh();
           }
         }
@@ -155,37 +270,96 @@ export default function EmployeeDashboard() {
     return () => {
       channel.unsubscribe();
     };
-  }, [profile, fetchTasks, debounce]);
+  }, [profile, fetchTasks, debounce, addNotification]);
 
-  // Real-time subscription for comments
+  // Real-time subscription for comments with notifications
   useEffect(() => {
-    if (!profile || !selectedTask) return;
-
-    const refresh = debounce(() => fetchComments(selectedTask.id), 300);
+    if (!profile) return;
 
     const channel = supabase
-      .channel(`employee-comments:${selectedTask.id}`)
+      .channel(`employee-comments-global:${profile.id}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'comments', filter: `task_id=eq.${selectedTask.id}` },
-        refresh
+        { event: 'INSERT', schema: 'public', table: 'comments' },
+        async (payload) => {
+          console.log('[Realtime] Comment received:', payload);
+          const newComment = payload.new as Comment;
+          
+          // Only notify if comment is from someone else (manager)
+          if (newComment.user_id !== profile.id) {
+            console.log('[Realtime] Comment from someone else, checking task...');
+            // Find the task to check if it's assigned to this employee
+            const { data: taskData } = await supabase
+              .from('tasks')
+              .select('id, title, assigned_to')
+              .eq('id', newComment.task_id)
+              .single();
+            
+            console.log('[Realtime] Task data:', taskData, 'My ID:', profile.id);
+            
+            // Only notify if this task is assigned to current user
+            if (taskData && taskData.assigned_to === profile.id) {
+              console.log('[Realtime] Adding notification for comment');
+              addNotification({
+                taskId: newComment.task_id,
+                taskTitle: taskData.title,
+                type: 'comment_added',
+                message: 'New comment from manager',
+                read: false,
+              });
+            }
+          }
+          
+          // Refresh comments if viewing the task
+          if (selectedTask?.id === newComment.task_id) {
+            fetchComments(newComment.task_id);
+          }
+        }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'comments', filter: `task_id=eq.${selectedTask.id}` },
-        refresh
+        { event: 'DELETE', schema: 'public', table: 'comments' },
+        async (payload) => {
+          console.log('[Realtime] Comment deleted:', payload);
+          const deletedComment = payload.old as Comment;
+          
+          // Only notify if comment was from someone else (manager)
+          if (deletedComment.user_id !== profile.id) {
+            console.log('[Realtime] Comment deleted by someone else, checking task...');
+            // Find the task to check if it's assigned to this employee
+            const { data: taskData } = await supabase
+              .from('tasks')
+              .select('id, title, assigned_to')
+              .eq('id', deletedComment.task_id)
+              .single();
+            
+            // Only notify if this task is assigned to current user
+            if (taskData && taskData.assigned_to === profile.id) {
+              console.log('[Realtime] Adding notification for deleted comment');
+              addNotification({
+                taskId: deletedComment.task_id,
+                taskTitle: taskData.title,
+                type: 'comment_deleted',
+                message: 'Comment deleted by manager',
+                read: false,
+              });
+            }
+          }
+          
+          // Refresh comments if viewing the task
+          if (selectedTask?.id === deletedComment.task_id) {
+            fetchComments(deletedComment.task_id);
+          }
+        }
       )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'comments', filter: `task_id=eq.${selectedTask.id}` },
-        refresh
-      )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Comment subscription status:', status);
+      });
 
     return () => {
       channel.unsubscribe();
     };
-  }, [profile, selectedTask, debounce]);
+  }, [profile, selectedTask, addNotification]);
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     const prevTask = tasks.find(t => t.id === taskId);
@@ -260,6 +434,13 @@ export default function EmployeeDashboard() {
   };
 
   const fetchComments = useCallback(async (taskId: string) => {
+    if (!taskId) return;
+    // Check if task still exists in our list
+    const taskExists = tasks.some(t => t.id === taskId);
+    if (!taskExists) {
+      console.log('[fetchComments] Task no longer exists, skipping fetch');
+      return;
+    }
     try {
       const data = await apiGetComments(taskId);
       setComments(
@@ -269,19 +450,36 @@ export default function EmployeeDashboard() {
         })) as Comment[]
       );
     } catch (err) {
-      console.error('Failed to fetch comments:', err);
+      console.error('[fetchComments] Failed:', err);
+      // Don't throw - just log the error
     }
-  }, []);
+  }, [tasks]);
 
   const openDetailModal = (task: Task) => {
     setSelectedTask(task);
-    setComments([]); // Clear previous comments before fetching new ones
+    setComments([]);
     setShowDetailModal(true);
-    // Fetch comments asynchronously without blocking the modal opening
     fetchComments(task.id).catch((err) => {
       console.error('Failed to fetch comments:', err);
     });
   };
+
+  const handleNotificationClick = useCallback((taskId: string) => {
+    console.log('[EmployeeDashboard] Notification clicked for task:', taskId);
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      console.log('[EmployeeDashboard] Found task, opening detail modal');
+      markTaskAsRead(taskId);
+      openDetailModal(task);
+    } else {
+      console.log('[EmployeeDashboard] Task not found in current tasks list');
+    }
+  }, [tasks, markTaskAsRead]);
+
+  // Clear all notifications on mount (fresh start)
+  useEffect(() => {
+    notifications.forEach(n => clearNotification(n.id));
+  }, []);
 
   const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,6 +509,19 @@ export default function EmployeeDashboard() {
     }
 
     setCommentLoading(false);
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!confirm('Are you sure you want to delete this comment?')) return;
+    if (!selectedTask) return;
+
+    try {
+      await apiDeleteComment(commentId);
+      await fetchComments(selectedTask.id);
+    } catch (err) {
+      console.error('Error deleting comment:', err);
+      alert('Failed to delete comment: ' + (err as Error).message);
+    }
   };
 
   const getStats = () => {
@@ -358,6 +569,7 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
+      <TaskToastNotifications onNotificationClick={handleNotificationClick} />
       <Header user={profile} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -417,14 +629,14 @@ export default function EmployeeDashboard() {
                       </tr>
                     ) : (
                       sortedTasks.map((task) => (
-                        <tr key={task.id} className={`transition-colors cursor-pointer ${
+                        <tr key={task.id} className={`transition-colors cursor-pointer relative ${
                           task.status === 'done'
                             ? 'opacity-50 bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-800/50'
                             : task.priority === 'bombe'
                               ? 'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800'
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 relative">
                             <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
                             <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground-tertiary)]'}`}>
                               Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
@@ -506,7 +718,7 @@ export default function EmployeeDashboard() {
                 {sortedTasks.map((task) => (
                   <div 
                     key={task.id} 
-                    className={`p-3 ${
+                    className={`p-3 relative ${
                       task.status === 'done'
                         ? 'opacity-60 bg-gray-50 dark:bg-gray-800/20'
                         : task.priority === 'bombe'
@@ -637,9 +849,19 @@ export default function EmployeeDashboard() {
                     <div key={comment.id} className="bg-[var(--background-tertiary)] rounded-lg p-3">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-medium text-sm">{comment.user_name}</span>
-                        <span className="text-xs text-[var(--foreground-muted)]">
-                          {format(new Date(comment.created_at), 'MMM d, h:mm a')}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-[var(--foreground-muted)]">
+                            {format(new Date(comment.created_at), 'MMM d, h:mm a')}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="p-1 text-[var(--danger)] hover:bg-[var(--danger)]/10"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </div>
                       <p className="text-sm text-[var(--foreground-secondary)]">{comment.content}</p>
                     </div>

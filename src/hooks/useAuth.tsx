@@ -26,43 +26,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchProfile = async (userId: string, retries = 0): Promise<boolean> => {
     console.log('[useAuth] Fetching profile for user:', userId, 'retry:', retries);
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    // Timeout wrapper - if query hangs, reject after 5 seconds
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Profile fetch timeout')), 5000);
+    });
+    
+    try {
+      const profilePromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      const { data, error } = await Promise.race([profilePromise, timeoutPromise]);
 
-    if (error) {
-      console.error('[useAuth] Profile fetch error:', error.message, error.code);
-    }
+      if (error) {
+        console.error('[useAuth] Profile fetch error:', error.message, error.code);
+      }
 
-    if (!error && data) {
-      console.log('[useAuth] Profile found:', data);
-      setProfile(data as Profile);
-      return true;
-    } else if (retries < 5) {
-      // Profile might not exist yet (trigger hasn't run)
-      // Wait and retry up to 5 times
-      return new Promise((resolve) => {
-        setTimeout(() => fetchProfile(userId, retries + 1).then(resolve), 500);
-      });
-    } else {
-      // Give up - profile doesn't exist, user needs to be created properly
-      console.error('[useAuth] Profile not found for user after 5 retries:', userId);
+      if (!error && data) {
+        console.log('[useAuth] Profile found:', data);
+        setProfile(data as Profile);
+        return true;
+      } else if (retries < 5) {
+        // Profile might not exist yet (trigger hasn't run)
+        // Wait and retry up to 5 times
+        return new Promise((resolve) => {
+          setTimeout(() => fetchProfile(userId, retries + 1).then(resolve), 500);
+        });
+      } else {
+        // Give up - profile doesn't exist, user needs to be created properly
+        console.error('[useAuth] Profile not found for user after 5 retries:', userId);
+        return false;
+      }
+    } catch (err) {
+      console.error('[useAuth] Profile fetch exception:', err);
+      // If timed out or other error, retry if under limit
+      if (retries < 5) {
+        console.log('[useAuth] Retrying after error...');
+        return new Promise((resolve) => {
+          setTimeout(() => fetchProfile(userId, retries + 1).then(resolve), 500);
+        });
+      }
       return false;
     }
   };
 
   useEffect(() => {
+    // Global timeout failsafe - ensure loading always completes within 3 seconds max
+    const globalTimeout = setTimeout(() => {
+      console.warn('[useAuth] Global timeout reached, forcing loading to false');
+      setLoading(false);
+    }, 3000);
+
     // Get initial session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('[useAuth] Initial session:', session?.user?.id);
       setUser(session?.user ?? null);
-      // Store token for custom API client
       setAuthToken(session?.access_token || null);
+      
+      // Don't block on profile fetch - do it in background
       if (session?.user) {
-        await fetchProfile(session.user.id);
+        fetchProfile(session.user.id).then((success) => {
+          console.log('[useAuth] Profile fetch completed:', success);
+        }).catch((err) => {
+          console.error('[useAuth] Profile fetch failed:', err);
+        });
       }
+      
+      clearTimeout(globalTimeout);
+      setLoading(false);
+    }).catch((err) => {
+      console.error('[useAuth] Session error:', err);
+      clearTimeout(globalTimeout);
       setLoading(false);
     });
 
@@ -71,18 +107,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         console.log('[useAuth] Auth state change:', event, session?.user?.id);
         setUser(session?.user ?? null);
-        // Store/update token for custom API client
         setAuthToken(session?.access_token || null);
+        
+        // Don't block on profile fetch
         if (session?.user) {
-          await fetchProfile(session.user.id);
+          fetchProfile(session.user.id).catch(() => {});
         } else {
           setProfile(null);
         }
+        
+        clearTimeout(globalTimeout);
         setLoading(false);
       }
     );
 
     return () => {
+      clearTimeout(globalTimeout);
       subscription.unsubscribe();
     };
   }, []);
