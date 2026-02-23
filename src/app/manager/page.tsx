@@ -66,11 +66,13 @@ export default function ManagerDashboard() {
   const [employeeSearch, setEmployeeSearch] = useState<string>('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState<boolean>(false);
   const [taskSearch, setTaskSearch] = useState<string>('');
+  const [mutatingTaskIds, setMutatingTaskIds] = useState<Set<string>>(new Set());
   
   // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('normal');
+  const [status, setStatus] = useState<TaskStatus>('todo');
   const [dueDate, setDueDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [formLoading, setFormLoading] = useState(false);
@@ -225,6 +227,7 @@ export default function ManagerDashboard() {
     setTitle('');
     setDescription('');
     setPriority('normal');
+    setStatus('todo');
     setDueDate('');
     setAssignedTo('');
     setEmployeeSearch('');
@@ -317,6 +320,7 @@ export default function ManagerDashboard() {
           title: title.trim(),
           description: description.trim() || null,
           priority: validPriority,
+          status: status,
           due_date: dueDate || null,
           assigned_to: assignedTo || selectedTask.assigned_to,
         });
@@ -355,11 +359,41 @@ export default function ManagerDashboard() {
     }
   };
 
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    const prevTask = tasks.find(t => t.id === taskId);
+    if (!prevTask) return;
+
+    setMutatingTaskIds(prev => new Set(prev).add(taskId));
+
+    // Optimistic update
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
+    if (selectedTask?.id === taskId) {
+      setSelectedTask((prev) => (prev ? { ...prev, status: newStatus } : prev));
+    }
+
+    try {
+      await apiUpdateTask(taskId, { status: newStatus });
+    } catch (err) {
+      // Rollback
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? prevTask : t)));
+      if (selectedTask?.id === taskId) setSelectedTask(prevTask);
+      alert('Failed to update status: ' + (err as Error).message);
+    } finally {
+      setMutatingTaskIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(taskId);
+        return newSet;
+      });
+      fetchData(true);
+    }
+  };
+
   const openEditModal = (task: Task) => {
     setSelectedTask(task);
     setTitle(task.title);
     setDescription(task.description || '');
     setPriority(task.priority);
+    setStatus(task.status);
     setDueDate(task.due_date || '');
     setAssignedTo(task.assigned_to);
     setEmployeeSearch(task.assigned_to_name || '');
@@ -580,7 +614,12 @@ export default function ManagerDashboard() {
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
                           <td className="px-4 py-3">
-                            <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
+                            <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
+                              {task.title}
+                            </p>
+                            <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
+                              Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                            </p>
                             {task.description && (
                               <p className={`text-sm text-[var(--foreground-tertiary)] truncate max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
                             )}
@@ -608,11 +647,9 @@ export default function ManagerDashboard() {
                               <Button variant="ghost" size="sm" className="p-2" onClick={() => openDetailModal(task)}>
                                 <Eye className="w-4 h-4" />
                               </Button>
-                              {task.status !== 'done' && (
-                                <Button variant="ghost" size="sm" className="p-2" onClick={() => openEditModal(task)}>
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <Button variant="ghost" size="sm" className="p-2" onClick={() => openEditModal(task)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
                               <Button variant="danger" size="sm" className="p-2" onClick={() => handleDeleteTask(task.id)}>
                                 <Trash2 className="w-4 h-4" />
                               </Button>
@@ -652,6 +689,9 @@ export default function ManagerDashboard() {
                         <p className={`font-semibold text-sm leading-tight ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>
                           {task.title}
                         </p>
+                        <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
+                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                        </p>
                         {task.description && (
                           <p className={`text-xs mt-0.5 line-clamp-1 ${task.status === 'done' ? 'line-through' : 'text-[var(--foreground-tertiary)]'}`}>
                             {task.description}
@@ -686,11 +726,9 @@ export default function ManagerDashboard() {
                         <Button variant="ghost" size="sm" className="p-1" onClick={() => openDetailModal(task)}>
                           <Eye className="w-4 h-4" />
                         </Button>
-                        {task.status !== 'done' && (
-                          <Button variant="ghost" size="sm" className="p-1" onClick={() => openEditModal(task)}>
-                            <Pencil className="w-4 h-4" />
-                          </Button>
-                        )}
+                        <Button variant="ghost" size="sm" className="p-1" onClick={() => openEditModal(task)}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
                         <Button variant="danger" size="sm" className="p-1" onClick={() => handleDeleteTask(task.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -921,7 +959,7 @@ export default function ManagerDashboard() {
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
           />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1.5">
                 Priority
@@ -933,9 +971,15 @@ export default function ManagerDashboard() {
                   onChange={(e) => setPriority(e.target.checked ? 'bombe' : 'normal')}
                   className="w-4 h-4 rounded border-[var(--border)] text-[var(--danger)] focus:ring-[var(--primary)]"
                 />
-                <span className="text-sm text-[var(--foreground)]">🚨 BOMBE (Urgent)</span>
+                <span className="text-sm text-[var(--foreground)]">🚨 BOMBE</span>
               </label>
             </div>
+            <Select
+              label="Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as TaskStatus)}
+              options={statusOptions}
+            />
             <Input
               label="Due Date"
               type="date"

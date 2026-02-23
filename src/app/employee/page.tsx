@@ -426,6 +426,9 @@ export default function EmployeeDashboard() {
                         }`}>
                           <td className="px-4 py-3">
                             <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
+                            <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground-tertiary)]'}`}>
+                              Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                            </p>
                             {task.description && (
                               <p className={`text-sm truncate max-w-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
                             )}
@@ -516,6 +519,9 @@ export default function EmployeeDashboard() {
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium text-sm leading-tight ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>
                           {task.title}
+                        </p>
+                        <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground-tertiary)]'}`}>
+                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
                         </p>
                         {task.description && (
                           <p className={`text-xs mt-0.5 line-clamp-1 ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>
