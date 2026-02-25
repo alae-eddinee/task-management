@@ -1,6 +1,8 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+
+const STORAGE_KEY = 'task-notifications-pending';
 
 export type TaskNotificationType = 'task_created' | 'task_updated' | 'comment_added' | 'comment_deleted' | 'status_changed';
 
@@ -36,6 +38,45 @@ export function TaskNotificationProvider({ children }: { children: React.ReactNo
   
   // Use a ref to track IDs being added to prevent duplicates during rapid calls
   const pendingIdsRef = useRef<Set<string>>(new Set());
+
+  // Load pending notifications from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as TaskNotification[];
+        if (parsed.length > 0) {
+          // Show up to maxVisibleNotifications, queue the rest
+          const toShow = parsed.slice(0, maxVisibleNotifications);
+          const toQueue = parsed.slice(maxVisibleNotifications);
+          setNotifications(toShow);
+          setNotificationQueue(toQueue);
+          
+          // Restore unread task IDs
+          const taskIds = new Set(parsed.map(n => n.taskId));
+          setUnreadTaskIds(taskIds);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load notifications from storage:', e);
+    }
+  }, []);
+
+  // Save notifications to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const allNotifications = [...notifications, ...notificationQueue];
+      if (allNotifications.length > 0) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(allNotifications));
+      } else {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (e) {
+      console.error('Failed to save notifications to storage:', e);
+    }
+  }, [notifications, notificationQueue]);
 
   const clearNotification = useCallback((notificationId: string) => {
     setNotifications((prev) => {

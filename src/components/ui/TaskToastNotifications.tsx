@@ -2,7 +2,7 @@
 
 import { useTaskNotifications, TaskNotification } from '@/hooks/useTaskNotifications';
 import { X, FileText, MessageSquare, Plus, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 const iconMap = {
   task_created: Plus,
@@ -28,12 +28,119 @@ const typeColorMap = {
   status_changed: 'bg-green-500',
 };
 
+// Update favicon with notification badge
+function updateFaviconBadge(count: number) {
+  const originalFavicon = '/favicon.ico';
+  let faviconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  
+  if (!faviconLink) {
+    faviconLink = document.createElement('link');
+    faviconLink.rel = 'icon';
+    faviconLink.type = 'image/x-icon';
+    document.head.appendChild(faviconLink);
+  }
+
+  if (count === 0) {
+    faviconLink.href = originalFavicon;
+    document.title = document.title.replace(/^\(\d+\)\s*/, '');
+    return;
+  }
+
+  // Draw badge on canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = 32;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  // Draw original favicon or circle background
+  ctx.fillStyle = '#3b82f6';
+  ctx.beginPath();
+  ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // Draw badge circle
+  ctx.fillStyle = '#ef4444';
+  ctx.beginPath();
+  ctx.arc(24, 8, 8, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // Draw count
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const badgeText = count > 9 ? '9+' : count.toString();
+  ctx.fillText(badgeText, 24, 8);
+
+  faviconLink.href = canvas.toDataURL();
+  
+  // Update title with count
+  const title = document.title;
+  const cleanTitle = title.replace(/^\(\d+\)\s*/, '');
+  document.title = `(${count}) ${cleanTitle}`;
+}
+
 interface TaskToastNotificationsProps {
   onNotificationClick?: (taskId: string) => void;
 }
 
 export function TaskToastNotifications({ onNotificationClick }: TaskToastNotificationsProps) {
-  const { notifications, clearNotification } = useTaskNotifications();
+  const { notifications, clearNotification, notificationQueue } = useTaskNotifications();
+  const prevCountRef = useRef(0);
+  const audioUnlockedRef = useRef(false);
+
+  // Unlock audio on first user interaction
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (audioUnlockedRef.current) return;
+      
+      const audio = new Audio('/sound/crystal_clear.mp3');
+      audio.volume = 0;
+      audio.play().then(() => {
+        audioUnlockedRef.current = true;
+        console.log('[Notification] Audio unlocked');
+      }).catch(() => {
+        // Still mark as unlocked - next attempt might work
+        audioUnlockedRef.current = true;
+      });
+    };
+
+    window.addEventListener('click', unlockAudio, { once: true });
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener('click', unlockAudio);
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
+
+  // Play sound and update favicon when new notifications arrive
+  useEffect(() => {
+    const totalCount = notifications.length + notificationQueue.length;
+    
+    // Play sound if count increased (new notification)
+    if (totalCount > prevCountRef.current && totalCount > 0) {
+      try {
+        const audio = new Audio('/sound/crystal_clear.mp3');
+        audio.volume = 0.5;
+        
+        audio.play()
+          .then(() => console.log('[Notification] Sound playing'))
+          .catch((err) => console.log('[Notification] Audio blocked:', err.message));
+      } catch (err) {
+        console.error('[Notification] Audio error:', err);
+      }
+    }
+    prevCountRef.current = totalCount;
+
+    // Update favicon badge
+    if (typeof window !== 'undefined') {
+      updateFaviconBadge(totalCount);
+    }
+  }, [notifications, notificationQueue]);
 
   // Deduplicate notifications by ID to prevent React key errors
   const uniqueNotifications = notifications.filter((n, index, self) => 
