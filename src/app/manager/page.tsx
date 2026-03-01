@@ -489,6 +489,12 @@ function ManagerDashboardInner() {
           status: status,
           due_date: dueDate || null,
           assigned_to: assignedTo || selectedTask.assigned_to,
+          // Recurring task fields
+          is_recurring: isRecurring,
+          recurrence_pattern: isRecurring ? recurrencePattern : null,
+          recurrence_start_date: isRecurring ? (recurrenceStartDate || new Date().toISOString().split('T')[0]) : null,
+          recurrence_end_date: isRecurring ? recurrenceEndDate : null,
+          recurrence_day_of_week: isRecurring && recurrencePattern === 'weekly' ? recurrenceDayOfWeek : null,
         });
 
         setShowEditModal(false);
@@ -563,6 +569,12 @@ function ManagerDashboardInner() {
     setDueDate(task.due_date || '');
     setAssignedTo(task.assigned_to);
     setEmployeeSearch(task.assigned_to_name || '');
+    // Initialize recurring task state from task
+    setIsRecurring(task.is_recurring || false);
+    setRecurrencePattern(task.recurrence_pattern || 'daily');
+    setRecurrenceStartDate(task.recurrence_start_date || '');
+    setRecurrenceEndDate(task.recurrence_end_date);
+    setRecurrenceDayOfWeek(task.recurrence_day_of_week);
     setShowEditModal(true);
   };
 
