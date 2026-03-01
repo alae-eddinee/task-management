@@ -70,8 +70,8 @@ export function RecurringTaskSelector({
         onClick={handleToggleRecurring}
         className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
           isRecurring
-            ? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-blue-900/20 dark:border-blue-700 dark:text-blue-300'
-            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300'
+            ? 'bg-[var(--primary)]/10 border-[var(--primary)] text-[var(--primary)]'
+            : 'bg-[var(--background)] border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--background-secondary)]'
         }`}
       >
         <Repeat className="w-4 h-4" />
@@ -79,7 +79,7 @@ export function RecurringTaskSelector({
           {isRecurring ? 'Recurring Task' : 'Make Recurring'}
         </span>
         {isRecurring && (
-          <span className="ml-2 text-xs bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-200 px-2 py-0.5 rounded-full">
+          <span className="ml-2 text-xs bg-[var(--primary)] text-white px-2 py-0.5 rounded-full">
             {formatRecurrencePattern(pattern, dayOfWeek)}
           </span>
         )}
