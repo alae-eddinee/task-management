@@ -689,7 +689,15 @@ function EmployeeDashboardInner() {
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
                           <td className="px-4 py-3 relative">
-                            <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>{task.title}</p>
+                            <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
+                              {task.title}
+                              {task.is_recurring && (
+                                <span className="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-white/20 text-white">
+                                  <Repeat className="w-3 h-3 mr-0.5" />
+                                  {task.recurrence_pattern || 'daily'}
+                                </span>
+                              )}
+                            </p>
                             <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground-tertiary)]'}`}>
                               Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
                             </p>
@@ -786,6 +794,11 @@ function EmployeeDashboardInner() {
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium text-sm leading-tight ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>
                           {task.title}
+                          {task.is_recurring && (
+                            <span className="inline-flex items-center ml-1 px-1 py-0.5 rounded text-xs font-medium bg-white/20 text-white">
+                              <Repeat className="w-3 h-3" />
+                            </span>
+                          )}
                         </p>
                         <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground-tertiary)]'}`}>
                           Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
