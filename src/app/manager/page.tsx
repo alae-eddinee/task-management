@@ -146,11 +146,14 @@ function ManagerDashboardInner() {
       setEmployees(employeesData as Profile[]);
 
       const tasksData = await apiGetTasks();
+      console.log('[fetchData] First task from API:', tasksData[0]);
+      console.log('[fetchData] First task is_recurring:', tasksData[0]?.is_recurring);
       const mappedTasks = tasksData.map((t) => ({
         ...t,
         assigned_to_name: t.assigned_to_name?.full_name,
         created_by_name: t.created_by_name?.full_name,
       })) as Task[];
+      console.log('[fetchData] First mapped task is_recurring:', mappedTasks[0]?.is_recurring);
       setTasks(mappedTasks);
 
       // Roll over recurring tasks that have passed their due date
@@ -601,6 +604,11 @@ function ManagerDashboardInner() {
   };
 
   const openEditModal = (task: Task) => {
+    console.log('[openEditModal] Opening task:', task.id, task.title);
+    console.log('[openEditModal] Raw task.is_recurring:', task.is_recurring);
+    console.log('[openEditModal] Raw task.recurrence_pattern:', task.recurrence_pattern);
+    console.log('[openEditModal] Raw task.recurrence_start_date:', task.recurrence_start_date);
+    
     setSelectedTask(task);
     setTitle(task.title);
     setDescription(task.description || '');
@@ -610,7 +618,9 @@ function ManagerDashboardInner() {
     setAssignedTo(task.assigned_to);
     setEmployeeSearch(task.assigned_to_name || '');
     // Initialize recurring task state from task
-    setIsRecurring(task.is_recurring || false);
+    const recurringValue = task.is_recurring === true;
+    console.log('[openEditModal] Setting isRecurring to:', recurringValue);
+    setIsRecurring(recurringValue);
     setRecurrencePattern(task.recurrence_pattern || 'daily');
     setRecurrenceStartDate(task.recurrence_start_date || '');
     setRecurrenceEndDate(task.recurrence_end_date);
