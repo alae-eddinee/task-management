@@ -748,17 +748,22 @@ function ManagerDashboardInner() {
         <div className="mb-6 flex flex-col sm:flex-row gap-4 items-end">
           <div className="w-full sm:flex-1">
             <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1.5">
-              Search by Employee
+              Filter by Employee
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground-muted)]" />
-              <input
-                type="text"
-                placeholder="Search employee name..."
+              <select
                 value={taskSearch}
                 onChange={(e) => setTaskSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 bg-white border border-[var(--border)] rounded-lg text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent"
-              />
+                className="w-full px-3 py-2 bg-white border border-[var(--border)] rounded-lg text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent appearance-none cursor-pointer"
+              >
+                <option value="">All Employees</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.full_name}>
+                    {e.full_name}
+                  </option>
+                ))}
+              </select>
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--foreground-muted)] pointer-events-none" />
             </div>
           </div>
           <div className="w-full sm:w-64">
@@ -993,10 +998,17 @@ function ManagerDashboardInner() {
                     {/* Employee Tasks Table */}
                     <div className="max-h-48 sm:max-h-64 overflow-y-auto">
                       <table className="w-full">
+                        <thead className="bg-[var(--background-secondary)] border-b border-[var(--border)]">
+                          <tr>
+                            <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-[var(--foreground-secondary)]">Task</th>
+                            <th className="px-1 sm:px-2 py-2 text-center text-xs font-medium text-[var(--foreground-secondary)] w-16">Priority</th>
+                            <th className="px-1 sm:px-2 py-2 text-right text-xs font-medium text-[var(--foreground-secondary)] w-24">Actions</th>
+                          </tr>
+                        </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                           {empTasks.length === 0 ? (
                             <tr>
-                              <td className="px-3 sm:px-4 py-3 sm:py-4 text-center text-[var(--foreground-tertiary)] text-xs sm:text-sm">
+                              <td colSpan={3} className="px-3 sm:px-4 py-3 sm:py-4 text-center text-[var(--foreground-tertiary)] text-xs sm:text-sm">
                                 No tasks
                               </td>
                             </tr>
@@ -1012,20 +1024,20 @@ function ManagerDashboardInner() {
                                 <td className="px-2 sm:px-3 py-1.5 sm:py-2">
                                   <p className={`text-xs sm:text-sm truncate max-w-[140px] sm:max-w-[180px] ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>{task.title}</p>
                                 </td>
-                                <td className="px-1 sm:px-2 py-1.5 sm:py-2">
+                                <td className="px-1 sm:px-2 py-1.5 sm:py-2 text-center">
                                   <span className={task.status === 'done' ? 'opacity-60' : ''}>
                                     <Badge variant={priorityBadgeVariant[task.priority]}>
                                       {task.priority === 'bombe' ? '🚨' : task.priority.charAt(0).toUpperCase()}
                                     </Badge>
                                   </span>
                                 </td>
-                                <td className="px-1 sm:px-2 py-1.5 sm:py-2 text-right">
-                                  <div className="flex items-center gap-1">
-                                    <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
-                                      <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <td className="px-1 sm:px-2 py-1.5 sm:py-2">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button variant="ghost" size="sm" className="p-1 sm:p-1.5 h-7 w-7" onClick={() => openDetailModal(task)}>
+                                      <Eye className="w-3.5 h-3.5" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openEditModal(task)}>
-                                      <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    <Button variant="ghost" size="sm" className="p-1 sm:p-1.5 h-7 w-7" onClick={() => openEditModal(task)}>
+                                      <Pencil className="w-3.5 h-3.5" />
                                     </Button>
                                   </div>
                                 </td>
