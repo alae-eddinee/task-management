@@ -90,9 +90,12 @@ export async function apiCreateTask(data: Record<string, unknown>) {
   const res = await apiFetch('/tasks', {
     method: 'POST',
     body: JSON.stringify(data),
+    headers: {
+      'Prefer': 'return=representation', // Tell Supabase to return the created record
+    },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-  // Return the created task data - Supabase returns an array with the created record
+  // Supabase returns an array with the created record
   const json = await res.json();
   console.log('[apiCreateTask] Response JSON:', json);
   return json;
