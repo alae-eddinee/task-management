@@ -7,7 +7,7 @@ import { useAuth, useTaskNotifications } from '@/hooks';
 import { Header, StatsCard, OnlineUsers } from '@/components/layout';
 import { Button, Input, Select, Textarea, Modal, Card, Badge } from '@/components/ui';
 import { RecurringTaskSelector } from '@/components/ui/RecurringTaskSelector';
-import { formatRecurrencePattern } from '@/lib/recurring-tasks';
+import { formatRecurrencePattern, calculateNextOccurrence } from '@/lib/recurring-tasks';
 import { TaskNotificationProvider, TaskNotificationType } from '@/hooks/useTaskNotifications';
 import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
 import { Task, Profile, TaskPriority, TaskStatus, Comment, RecurrencePattern } from '@/types';
