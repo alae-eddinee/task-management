@@ -71,6 +71,13 @@ interface ApiTask extends Record<string, unknown> {
   updated_at: string;
   assigned_to_name?: { full_name: string };
   created_by_name?: { full_name: string };
+  // Recurring task fields
+  is_recurring?: boolean;
+  recurrence_pattern?: 'daily' | 'weekly' | 'monthly';
+  recurrence_start_date?: string;
+  recurrence_end_date?: string;
+  parent_task_id?: string;
+  recurrence_day_of_week?: number;
 }
 
 export async function apiGetTasks(): Promise<ApiTask[]> {
