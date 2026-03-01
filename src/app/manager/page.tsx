@@ -871,6 +871,12 @@ function ManagerDashboardInner() {
                             <div>
                                 <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
                                   {task.title}
+                                  {task.is_recurring && (
+                                    <span className="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
+                                      <Repeat className="w-3 h-3 mr-0.5" />
+                                      {task.recurrence_pattern || 'daily'}
+                                    </span>
+                                  )}
                                 </p>
                                 <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
                                   Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
@@ -944,6 +950,11 @@ function ManagerDashboardInner() {
                       <div className="flex-1 min-w-0">
                         <p className={`font-semibold text-sm leading-tight ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>
                           {task.title}
+                          {task.is_recurring && (
+                            <span className="inline-flex items-center ml-1.5 px-1 py-0.5 rounded text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
+                              <Repeat className="w-3 h-3" />
+                            </span>
+                          )}
                         </p>
                         <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
                           Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
@@ -1074,7 +1085,14 @@ function ManagerDashboardInner() {
                                     : 'hover:bg-[var(--background-secondary)]'
                               }`}>
                                 <td className="px-2 sm:px-3 py-1.5 sm:py-2">
-                                  <p className={`text-xs sm:text-sm truncate max-w-[140px] sm:max-w-[180px] ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>{task.title}</p>
+                                  <p className={`text-xs sm:text-sm truncate max-w-[140px] sm:max-w-[180px] ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>
+                                    {task.title}
+                                    {task.is_recurring && (
+                                      <span className="inline-flex items-center ml-1 text-[var(--primary)]" title={`Recurring ${task.recurrence_pattern || 'daily'}`}>
+                                        <Repeat className="w-3 h-3" />
+                                      </span>
+                                    )}
+                                  </p>
                                 </td>
                                 <td className="px-1 sm:px-2 py-1.5 sm:py-2 text-center">
                                   <span className={task.status === 'done' ? 'opacity-60' : ''}>
