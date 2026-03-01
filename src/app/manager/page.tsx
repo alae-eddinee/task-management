@@ -1306,7 +1306,21 @@ function ManagerDashboardInner() {
         {selectedTask && (
           <div className="space-y-4">
             <div>
-              <h3 className={`text-lg font-semibold ${selectedTask.priority === 'bombe' && selectedTask.status !== 'done' ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]'}`}>{selectedTask.title}</h3>
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className={`text-lg font-semibold ${selectedTask.priority === 'bombe' && selectedTask.status !== 'done' ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]'}`}>{selectedTask.title}</h3>
+                <div className="flex items-center gap-2">
+                  {selectedTask.is_recurring && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
+                      🔁 Recurring
+                    </span>
+                  )}
+                  {selectedTask.priority === 'bombe' && selectedTask.status !== 'done' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-[var(--danger)] text-white animate-pulse">
+                      🚨 BOMBE
+                    </span>
+                  )}
+                </div>
+              </div>
               {selectedTask.description && (
                 <p className="mt-2 text-[var(--foreground-secondary)]">{selectedTask.description}</p>
               )}

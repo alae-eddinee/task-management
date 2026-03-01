@@ -611,10 +611,10 @@ function EmployeeDashboardInner() {
                 <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)] sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Task</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Due</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase hidden md:table-cell">Created</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">View</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-28">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-20">Due</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-24 hidden md:table-cell">Created</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-16">View</th>
                   </tr>
                 </thead>
               </table>
@@ -645,32 +645,41 @@ function EmployeeDashboardInner() {
                               <p className={`text-sm truncate max-w-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            <select
-                              value={task.status}
-                              onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
-                              disabled={mutatingTaskIds.has(task.id)}
-                              className={`px-3 py-1.5 rounded-md text-sm font-medium border cursor-pointer focus:ring-2 focus:ring-[var(--primary)] ${
-                                task.priority === 'bombe' && task.status !== 'done'
-                                  ? 'bg-white/20 text-white border-white/50'
-                                  : task.status === 'done' ? 'bg-green-500 text-white dark:bg-green-600 border-transparent' :
-                                  task.status === 'todo' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border-transparent' :
-                                  'bg-blue-500 text-white dark:bg-blue-600 border-transparent'
-                              }`}
-                            >
-                              {statusOptions.map((opt) => (
-                                <option key={opt.value} value={opt.value} className="bg-white text-gray-900">
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
+                          <td className="px-4 py-3 text-center">
+                            <div className="relative inline-block">
+                              <select
+                                value={task.status}
+                                onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                                disabled={mutatingTaskIds.has(task.id)}
+                                className={`appearance-none px-3 py-1.5 pr-8 rounded-md text-sm font-medium border cursor-pointer focus:ring-2 focus:ring-[var(--primary)] focus:outline-none text-left ${
+                                  task.priority === 'bombe' && task.status !== 'done'
+                                    ? 'bg-white/20 text-white border-white/50'
+                                    : task.status === 'done' ? 'bg-green-500 text-white dark:bg-green-600 border-transparent' :
+                                    task.status === 'todo' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border-transparent' :
+                                    'bg-blue-500 text-white dark:bg-blue-600 border-transparent'
+                                }`}
+                              >
+                                {statusOptions.map((opt) => (
+                                  <option key={opt.value} value={opt.value} className="bg-white text-gray-900">
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <span className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${
+                                task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-current'
+                              }`}>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </span>
+                            </div>
                             {mutatingTaskIds.has(task.id) && (
                               <span className="inline-block align-middle ml-2">
                                 <span className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
                               </span>
                             )}
                           </td>
-                          <td className={`px-4 py-3 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
+                          <td className={`px-4 py-3 text-sm text-center ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
                             {task.due_date ? (
                               <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-[var(--danger)] font-bold' : 'text-[var(--foreground-secondary)]'}>
                                 {format(new Date(task.due_date), 'MMM d')}
@@ -679,15 +688,15 @@ function EmployeeDashboardInner() {
                               <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'}>-</span>
                             )}
                           </td>
-                          <td className={`px-4 py-3 text-sm hidden md:table-cell ${
+                          <td className={`px-4 py-3 text-sm text-center hidden md:table-cell ${
                             task.status === 'done' ? 'text-gray-400 line-through' :
                             task.priority === 'bombe' ? 'text-white' :
                             'text-[var(--foreground-secondary)]'
                           }`}>
                             {task.created_by_name || 'Unknown'}
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-end">
+                          <td className="px-4 py-3 text-center">
+                            <div className="flex items-center justify-center">
                               <Button 
                                 variant={task.priority === 'bombe' && task.status !== 'done' ? 'ghost' : 'ghost'} 
                                 size="sm" 
@@ -806,11 +815,18 @@ function EmployeeDashboardInner() {
             <div>
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="text-lg font-semibold text-[var(--foreground)]">{selectedTask.title}</h3>
-                {selectedTask.priority === 'bombe' && (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-[var(--danger)] text-white animate-pulse">
-                    🚨 BOMBE
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {selectedTask.is_recurring && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
+                      🔁 Recurring
+                    </span>
+                  )}
+                  {selectedTask.priority === 'bombe' && (
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-[var(--danger)] text-white animate-pulse">
+                      🚨 BOMBE
+                    </span>
+                  )}
+                </div>
               </div>
               {selectedTask.description && (
                 <p className="text-[var(--foreground-secondary)]">{selectedTask.description}</p>
