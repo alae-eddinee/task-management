@@ -92,7 +92,10 @@ export async function apiCreateTask(data: Record<string, unknown>) {
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
-  return res.status === 201 ? await res.json().catch(() => null) : null;
+  // Return the created task data - Supabase returns an array with the created record
+  const json = await res.json();
+  console.log('[apiCreateTask] Response JSON:', json);
+  return json;
 }
 
 export async function apiUpdateTask(id: string, data: Record<string, unknown>) {
