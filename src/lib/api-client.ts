@@ -81,7 +81,7 @@ interface ApiTask extends Record<string, unknown> {
 }
 
 export async function apiGetTasks(): Promise<ApiTask[]> {
-  const res = await apiFetch('/tasks?select=*,assigned_to_name:profiles!tasks_assigned_to_fkey(full_name),created_by_name:profiles!tasks_created_by_fkey(full_name)&order=priority.desc,created_at.desc');
+  const res = await apiFetch('/tasks?select=id,title,description,priority,status,due_date,assigned_to,created_by,created_at,updated_at,is_recurring,recurrence_pattern,recurrence_start_date,recurrence_end_date,recurrence_day_of_week,parent_task_id,assigned_to_name:profiles!tasks_assigned_to_fkey(full_name),created_by_name:profiles!tasks_created_by_fkey(full_name)&order=priority.desc,created_at.desc');
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
@@ -145,7 +145,7 @@ export async function apiDeleteComment(id: string) {
 }
 
 export async function apiGetTasksByParentId(parentTaskId: string): Promise<ApiTask[]> {
-  const res = await apiFetch(`/tasks?select=*,assigned_to_name:profiles!tasks_assigned_to_fkey(full_name),created_by_name:profiles!tasks_created_by_fkey(full_name)&parent_task_id=eq.${parentTaskId}&order=due_date.desc`);
+  const res = await apiFetch(`/tasks?select=id,title,description,priority,status,due_date,assigned_to,created_by,created_at,updated_at,is_recurring,recurrence_pattern,recurrence_start_date,recurrence_end_date,recurrence_day_of_week,parent_task_id,assigned_to_name:profiles!tasks_assigned_to_fkey(full_name),created_by_name:profiles!tasks_created_by_fkey(full_name)&parent_task_id=eq.${parentTaskId}&order=due_date.desc`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
