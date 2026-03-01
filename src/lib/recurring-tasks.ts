@@ -210,9 +210,7 @@ export function generateMissingInstances(
       status: 'todo',
       due_date: dueDate,
       assigned_to: parentTask.assigned_to,
-      assigned_to_name: parentTask.assigned_to_name,
       created_by: parentTask.created_by,
-      created_by_name: parentTask.created_by_name,
       updated_by: parentTask.updated_by,
       is_recurring: false, // Instances are not recurring
       parent_task_id: parentTask.id,
