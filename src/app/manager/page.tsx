@@ -800,12 +800,12 @@ function ManagerDashboardInner() {
               <table className="w-full min-w-[640px]">
                 <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)] sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Task</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Assigned</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Priority</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Due</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase">Actions</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[28%]">Task</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[18%]">Assigned</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[12%]">Priority</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[14%]">Status</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[10%]">Due</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[18%]">Actions</th>
                   </tr>
                 </thead>
               </table>
@@ -827,7 +827,7 @@ function ManagerDashboardInner() {
                               ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
-                          <td className="px-4 py-3 relative">
+                          <td className="px-4 py-3 relative w-[28%]">
                             <div>
                                 <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
                                   {task.title}
@@ -840,25 +840,25 @@ function ManagerDashboardInner() {
                                 )}
                               </div>
                           </td>
-                          <td className={`px-4 py-3 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
+                          <td className={`px-4 py-3 text-sm w-[18%] ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
                             {task.assigned_to_name || 'Unknown'}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-[12%] text-center">
                             {task.priority === 'bombe' && (
                               <span className={task.status === 'done' ? 'line-through opacity-60' : ''}>
                                 <Badge variant="danger">🚨 BOMBE</Badge>
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-[14%] text-center">
                             <Badge variant={statusBadgeVariant[task.status]}>
                               {task.status === 'in_progress' ? 'In Progress' : task.status === 'todo' ? 'To Do' : 'Done'}
                             </Badge>
                           </td>
-                          <td className={`px-4 py-3 text-sm ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-[var(--foreground-secondary)]'}`}>
+                          <td className={`px-4 py-3 text-sm w-[10%] text-center ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-[var(--foreground-secondary)]'}`}>
                             {task.due_date ? format(new Date(task.due_date), 'MMM d') : '-'}
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-[18%]">
                             <div className="flex items-center justify-end gap-2">
                               <Button variant="ghost" size="sm" className="p-2" onClick={() => openDetailModal(task)}>
                                 <Eye className="w-4 h-4" />
