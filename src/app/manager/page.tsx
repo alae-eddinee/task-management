@@ -6,9 +6,11 @@ import { supabase } from '@/lib/supabase';
 import { useAuth, useTaskNotifications } from '@/hooks';
 import { Header, StatsCard, OnlineUsers } from '@/components/layout';
 import { Button, Input, Select, Textarea, Modal, Card, Badge } from '@/components/ui';
+import { RecurringTaskSelector } from '@/components/ui/RecurringTaskSelector';
+import { generateRecurringTaskInstances } from '@/lib/recurring-tasks';
 import { TaskNotificationProvider, TaskNotificationType } from '@/hooks/useTaskNotifications';
 import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
-import { Task, Profile, TaskPriority, TaskStatus, Comment } from '@/types';
+import { Task, Profile, TaskPriority, TaskStatus, Comment, RecurrencePattern } from '@/types';
 import { insertNotification } from '@/lib/supabase-queries';
 import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment, apiDeleteComment } from '@/lib/api-client';
 import { 
@@ -85,6 +87,13 @@ function ManagerDashboardInner() {
   const [dueDate, setDueDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [formLoading, setFormLoading] = useState(false);
+  
+  // Recurring task state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrencePattern, setRecurrencePattern] = useState<RecurrencePattern>('daily');
+  const [recurrenceStartDate, setRecurrenceStartDate] = useState('');
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState<string | undefined>(undefined);
+  const [recurrenceDayOfWeek, setRecurrenceDayOfWeek] = useState<number | undefined>(undefined);
 
   const debounce = useCallback((fn: () => void, delayMs: number) => {
     let timeoutId: number | undefined;
@@ -345,6 +354,12 @@ function ManagerDashboardInner() {
     setDueDate('');
     setAssignedTo('');
     setEmployeeSearch('');
+    // Reset recurring task state
+    setIsRecurring(false);
+    setRecurrencePattern('daily');
+    setRecurrenceStartDate('');
+    setRecurrenceEndDate(undefined);
+    setRecurrenceDayOfWeek(undefined);
   };
 
   const handleCreateTask = async (e: React.FormEvent) => {
@@ -354,6 +369,7 @@ function ManagerDashboardInner() {
     console.log('title:', title);
     console.log('assignedTo:', assignedTo);
     console.log('profile:', profile?.id, profile?.role);
+    console.log('isRecurring:', isRecurring);
     
     if (!title.trim()) {
       alert('Please enter a task title');
@@ -396,17 +412,53 @@ function ManagerDashboardInner() {
       
       console.log('Inserting task:', taskData);
       
-      await apiCreateTask(taskData);
+      const newTask = await apiCreateTask(taskData);
       
-      console.log('Insert successful');
+      console.log('Insert successful:', newTask);
 
-      // Notification disabled - notifications table may be missing or blocked by RLS
-      // insertNotification({
-      //   user_id: assignedTo,
-      //   title: 'New Task Assigned',
-      //   message: `You have been assigned a new task: "${title}"`,
-      //   type: 'task_assigned',
-      // }).catch((err) => console.error('Notification error:', err));
+      // If recurring, create the parent recurring task and generate instances
+      if (isRecurring && newTask) {
+        const recurringConfig = {
+          is_recurring: true,
+          recurrence_pattern: recurrencePattern,
+          recurrence_start_date: recurrenceStartDate || new Date().toISOString().split('T')[0],
+          recurrence_end_date: recurrenceEndDate,
+          recurrence_day_of_week: recurrenceDayOfWeek,
+        };
+        
+        // Update the task to be recurring
+        await apiUpdateTask(newTask[0]?.id || newTask.id, recurringConfig);
+        
+        // Generate instances for the next 30 days
+        const parentTask: Task = {
+          ...taskData,
+          id: newTask[0]?.id || newTask.id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          updated_by: profile.id,
+          description: taskData.description || undefined,
+          due_date: taskData.due_date || undefined,
+        };
+        
+        const instances = generateRecurringTaskInstances(
+          parentTask,
+          {
+            is_recurring: true,
+            recurrence_pattern: recurrencePattern,
+            recurrence_start_date: recurringConfig.recurrence_start_date,
+            recurrence_end_date: recurringConfig.recurrence_end_date,
+            recurrence_day_of_week: recurringConfig.recurrence_day_of_week,
+          },
+          30
+        );
+        
+        // Create instances
+        for (const instance of instances) {
+          await apiCreateTask(instance);
+        }
+        
+        console.log(`Created ${instances.length} recurring task instances`);
+      }
 
       resetForm();
       setShowCreateModal(false);
@@ -1078,6 +1130,23 @@ function ManagerDashboardInner() {
               </p>
             )}
           </div>
+          
+          {/* Recurring Task Selector */}
+          <RecurringTaskSelector
+            isRecurring={isRecurring}
+            pattern={recurrencePattern}
+            startDate={recurrenceStartDate}
+            endDate={recurrenceEndDate}
+            dayOfWeek={recurrenceDayOfWeek}
+            onChange={(config) => {
+              setIsRecurring(config.isRecurring);
+              setRecurrencePattern(config.pattern);
+              setRecurrenceStartDate(config.startDate);
+              setRecurrenceEndDate(config.endDate);
+              setRecurrenceDayOfWeek(config.dayOfWeek);
+            }}
+          />
+          
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="ghost" type="button" onClick={() => { setShowCreateModal(false); resetForm(); }}>
               Cancel

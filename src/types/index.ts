@@ -14,6 +14,8 @@ export interface Profile {
   updated_at: string;
 }
 
+export type RecurrencePattern = 'daily' | 'weekly' | 'monthly';
+
 export interface Task {
   id: string;
   title: string;
@@ -28,6 +30,13 @@ export interface Task {
   created_at: string;
   updated_at: string;
   updated_by?: string;
+  // Recurring task fields
+  is_recurring?: boolean;
+  recurrence_pattern?: RecurrencePattern;
+  recurrence_start_date?: string;
+  recurrence_end_date?: string;
+  parent_task_id?: string;
+  recurrence_day_of_week?: number; // 0=Sunday, 6=Saturday
 }
 
 export interface Comment {
