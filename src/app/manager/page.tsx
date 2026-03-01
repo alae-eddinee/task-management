@@ -1306,21 +1306,14 @@ function ManagerDashboardInner() {
         {selectedTask && (
           <div className="space-y-4">
             <div>
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className={`text-lg font-semibold ${selectedTask.priority === 'bombe' && selectedTask.status !== 'done' ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]'}`}>{selectedTask.title}</h3>
-                <div className="flex items-center gap-2">
-                  {selectedTask.is_recurring && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20">
-                      🔁 Recurring
-                    </span>
-                  )}
-                  {selectedTask.priority === 'bombe' && selectedTask.status !== 'done' && (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-bold bg-[var(--danger)] text-white animate-pulse">
-                      🚨 BOMBE
-                    </span>
-                  )}
+              <h3 className={`text-lg font-semibold ${selectedTask.priority === 'bombe' && selectedTask.status !== 'done' ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]'}`}>{selectedTask.title}</h3>
+              {selectedTask.is_recurring && (
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
+                    🔁 Recurring ({selectedTask.recurrence_pattern || 'daily'})
+                  </span>
                 </div>
-              </div>
+              )}
               {selectedTask.description && (
                 <p className="mt-2 text-[var(--foreground-secondary)]">{selectedTask.description}</p>
               )}
@@ -1346,6 +1339,22 @@ function ManagerDashboardInner() {
                 <p className="text-sm text-[var(--foreground-tertiary)]">Due Date</p>
                 <p className="font-medium">{selectedTask.due_date ? format(new Date(selectedTask.due_date), 'MMM d, yyyy') : 'No due date'}</p>
               </div>
+              {selectedTask.is_recurring && (
+                <div className="col-span-2">
+                  <p className="text-sm text-[var(--foreground-tertiary)]">Recurrence</p>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
+                      🔁 Recurring ({selectedTask.recurrence_pattern || 'daily'})
+                    </span>
+                    {selectedTask.recurrence_start_date && (
+                      <span className="text-xs text-[var(--foreground-secondary)]">
+                        From {format(new Date(selectedTask.recurrence_start_date), 'MMM d, yyyy')}
+                        {selectedTask.recurrence_end_date && ` to ${format(new Date(selectedTask.recurrence_end_date), 'MMM d, yyyy')}`}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Comments Section */}
