@@ -466,27 +466,43 @@ function ManagerDashboardInner() {
       const newTask = await apiCreateTask(taskData);
       
       console.log('Insert successful:', newTask);
+      console.log('newTask type:', Array.isArray(newTask) ? 'array' : typeof newTask);
+      console.log('newTask[0]?.id:', newTask?.[0]?.id);
+      console.log('newTask?.id:', newTask?.id);
 
       // If recurring, just update the task with recurring config
       // No instances are generated upfront - task will rollover when due date arrives
       if (isRecurring && newTask) {
+        const taskId = Array.isArray(newTask) ? newTask[0]?.id : newTask.id;
+        
+        if (!taskId) {
+          console.error('Could not get task ID from created task:', newTask);
+          throw new Error('Task created but ID not found');
+        }
+        
         const recurringConfig = {
           is_recurring: true,
           recurrence_pattern: recurrencePattern,
           recurrence_start_date: recurrenceStartDate || new Date().toISOString().split('T')[0],
           recurrence_end_date: recurrenceEndDate,
-          recurrence_day_of_week: recurrenceDayOfWeek,
+          recurrence_day_of_week: recurrencePattern === 'weekly' ? recurrenceDayOfWeek : null,
         };
         
-        // Update the task to be recurring
-        await apiUpdateTask(newTask[0]?.id || newTask.id, recurringConfig);
+        console.log('Updating task', taskId, 'with recurring config:', recurringConfig);
         
-        console.log('Created recurring task (no instances generated upfront)');
+        // Update the task to be recurring
+        await apiUpdateTask(taskId, recurringConfig);
+        
+        console.log('Successfully created recurring task');
+        
+        // Small delay to ensure DB has committed the recurring config
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       resetForm();
       setShowCreateModal(false);
-      fetchData();
+      // Force a fresh fetch to get the recurring fields
+      await fetchData();
     } catch (err) {
       console.error('Exception creating task:', err);
       alert('An error occurred while creating the task');
