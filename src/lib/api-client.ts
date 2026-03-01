@@ -96,11 +96,17 @@ export async function apiCreateTask(data: Record<string, unknown>) {
 }
 
 export async function apiUpdateTask(id: string, data: Record<string, unknown>) {
+  console.log('[apiUpdateTask] Updating task', id, 'with data:', data);
   const res = await apiFetch(`/tasks?id=eq.${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  console.log('[apiUpdateTask] Response status:', res.status);
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error('[apiUpdateTask] Error:', res.status, errorText);
+    throw new Error(`HTTP ${res.status}: ${errorText}`);
+  }
   return res.status === 204 ? null : await res.json().catch(() => null);
 }
 

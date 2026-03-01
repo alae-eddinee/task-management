@@ -475,11 +475,14 @@ function ManagerDashboardInner() {
 
       // If recurring, just update the task with recurring config
       // No instances are generated upfront - task will rollover when due date arrives
+      console.log('[handleCreateTask] Checking if recurring:', isRecurring, newTask);
       if (isRecurring && newTask) {
         const taskId = Array.isArray(newTask) ? newTask[0]?.id : newTask.id;
         
+        console.log('[handleCreateTask] Extracted taskId:', taskId);
+        
         if (!taskId) {
-          console.error('Could not get task ID from created task:', newTask);
+          console.error('[handleCreateTask] Could not get task ID from created task:', newTask);
           throw new Error('Task created but ID not found');
         }
         
@@ -491,15 +494,21 @@ function ManagerDashboardInner() {
           recurrence_day_of_week: recurrencePattern === 'weekly' ? recurrenceDayOfWeek : null,
         };
         
-        console.log('Updating task', taskId, 'with recurring config:', recurringConfig);
+        console.log('[handleCreateTask] About to update task with recurring config:', recurringConfig);
         
         // Update the task to be recurring
-        await apiUpdateTask(taskId, recurringConfig);
-        
-        console.log('Successfully created recurring task');
+        try {
+          await apiUpdateTask(taskId, recurringConfig);
+          console.log('[handleCreateTask] Successfully updated task with recurring config');
+        } catch (updateErr) {
+          console.error('[handleCreateTask] Failed to update recurring config:', updateErr);
+          throw updateErr;
+        }
         
         // Small delay to ensure DB has committed the recurring config
         await new Promise(resolve => setTimeout(resolve, 200));
+      } else {
+        console.log('[handleCreateTask] Skipping recurring update - isRecurring:', isRecurring, 'newTask:', newTask);
       }
 
       resetForm();
