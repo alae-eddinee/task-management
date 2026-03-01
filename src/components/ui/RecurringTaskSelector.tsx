@@ -20,7 +20,7 @@ interface RecurringTaskSelectorProps {
   }) => void;
 }
 
-const patterns: RecurrencePattern[] = ['minutely', 'daily', 'weekly', 'monthly'];
+const patterns: RecurrencePattern[] = ['daily', 'weekly', 'monthly'];
 
 const daysOfWeek = [
   { value: 0, label: 'Sun' },

@@ -143,3 +143,9 @@ export async function apiDeleteComment(id: string) {
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
   return res.status === 204 ? null : await res.json().catch(() => null);
 }
+
+export async function apiGetTasksByParentId(parentTaskId: string): Promise<ApiTask[]> {
+  const res = await apiFetch(`/tasks?select=*,assigned_to_name:profiles!tasks_assigned_to_fkey(full_name),created_by_name:profiles!tasks_created_by_fkey(full_name)&parent_task_id=eq.${parentTaskId}&order=due_date.desc`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

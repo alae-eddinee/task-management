@@ -7,12 +7,12 @@ import { useAuth, useTaskNotifications } from '@/hooks';
 import { Header, StatsCard, OnlineUsers } from '@/components/layout';
 import { Button, Input, Select, Textarea, Modal, Card, Badge } from '@/components/ui';
 import { RecurringTaskSelector } from '@/components/ui/RecurringTaskSelector';
-import { generateRecurringTaskInstances } from '@/lib/recurring-tasks';
+import { generateRecurringTaskInstances, generateMissingInstances } from '@/lib/recurring-tasks';
 import { TaskNotificationProvider, TaskNotificationType } from '@/hooks/useTaskNotifications';
 import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
 import { Task, Profile, TaskPriority, TaskStatus, Comment, RecurrencePattern } from '@/types';
 import { insertNotification } from '@/lib/supabase-queries';
-import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment, apiDeleteComment } from '@/lib/api-client';
+import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment, apiDeleteComment, apiGetTasksByParentId } from '@/lib/api-client';
 import { 
   ClipboardList, 
   Clock, 
@@ -147,11 +147,15 @@ function ManagerDashboardInner() {
       setEmployees(employeesData as Profile[]);
 
       const tasksData = await apiGetTasks();
-      setTasks(tasksData.map((t) => ({
+      const mappedTasks = tasksData.map((t) => ({
         ...t,
         assigned_to_name: t.assigned_to_name?.full_name,
         created_by_name: t.created_by_name?.full_name,
-      })) as Task[]);
+      })) as Task[];
+      setTasks(mappedTasks);
+
+      // Sync recurring tasks - generate missing instances for infinite recurrence
+      await syncRecurringTasks(mappedTasks);
     } catch (err) {
       console.error('[fetchData] API error:', err);
     } finally {
@@ -161,6 +165,42 @@ function ManagerDashboardInner() {
       }
     }
   }, [profile]);
+
+  // Sync recurring tasks - generate missing instances for infinite recurrence
+  const syncRecurringTasks = async (currentTasks: Task[]) => {
+    try {
+      // Find recurring parent tasks (tasks with is_recurring=true and no parent_task_id)
+      const recurringParents = currentTasks.filter(
+        t => t.is_recurring && !t.parent_task_id
+      );
+
+      if (recurringParents.length === 0) return;
+
+      console.log(`[syncRecurringTasks] Found ${recurringParents.length} recurring parent tasks`);
+
+      for (const parent of recurringParents) {
+        // Get existing instances for this parent
+        const instancesData = await apiGetTasksByParentId(parent.id);
+        const existingInstances: Array<{ due_date: string }> = instancesData
+          .filter((t): t is typeof t & { due_date: string } => t.due_date !== undefined)
+          .map((t) => ({ due_date: t.due_date }));
+
+        // Generate missing instances
+        const missingInstances = generateMissingInstances(parent, existingInstances);
+
+        if (missingInstances.length > 0) {
+          console.log(`[syncRecurringTasks] Creating ${missingInstances.length} missing instances for task: ${parent.title}`);
+
+          // Create missing instances
+          for (const instance of missingInstances) {
+            await apiCreateTask(instance);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[syncRecurringTasks] Error:', err);
+    }
+  };
 
   useEffect(() => {
     if (!authLoading && !profile) {
@@ -449,8 +489,7 @@ function ManagerDashboardInner() {
             recurrence_start_date: recurringConfig.recurrence_start_date,
             recurrence_end_date: recurringConfig.recurrence_end_date,
             recurrence_day_of_week: recurringConfig.recurrence_day_of_week,
-          },
-          30
+          }
         );
         
         // Create instances

@@ -9,7 +9,7 @@ import { Button, Card, Badge, Modal, Textarea } from '@/components/ui';
 import { TaskNotificationProvider, type TaskNotificationType } from '@/hooks/useTaskNotifications';
 import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
 import type { Task, TaskStatus, Comment } from '@/types';
-import { apiGetTasks, apiUpdateTask, apiGetComments, apiCreateComment, apiDeleteComment } from '@/lib/api-client';
+import { apiGetTasks, apiUpdateTask, apiGetComments, apiCreateComment, apiDeleteComment, apiGetTasksByParentId, apiCreateTask } from '@/lib/api-client';
 import { 
   ClipboardList, 
   Clock, 
@@ -22,6 +22,7 @@ import {
   Repeat
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { generateMissingInstances } from '@/lib/recurring-tasks';
 
 const statusOptions: { value: TaskStatus; label: string; icon: React.ReactNode }[] = [
   { value: 'todo', label: 'To Do', icon: <Clock className="w-4 h-4" /> },
@@ -106,6 +107,9 @@ function EmployeeDashboardInner() {
         // Only update if task still exists - don't clear if modal is open
         return nextSelected || prevSelected;
       });
+
+      // Sync recurring tasks for this employee
+      await syncRecurringTasks(nextTasks);
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
     } finally {
@@ -115,6 +119,42 @@ function EmployeeDashboardInner() {
       }
     }
   }, [profile]);
+
+  // Sync recurring tasks - generate missing instances for infinite recurrence
+  const syncRecurringTasks = async (currentTasks: Task[]) => {
+    try {
+      // Find recurring parent tasks assigned to this employee
+      const recurringParents = currentTasks.filter(
+        (t) => t.is_recurring && !t.parent_task_id
+      );
+
+      if (recurringParents.length === 0) return;
+
+      console.log(`[syncRecurringTasks] Found ${recurringParents.length} recurring parent tasks for employee`);
+
+      for (const parent of recurringParents) {
+        // Get existing instances for this parent
+        const instancesData = await apiGetTasksByParentId(parent.id);
+        const existingInstances: Array<{ due_date: string }> = instancesData
+          .filter((t): t is typeof t & { due_date: string } => t.due_date !== undefined)
+          .map((t) => ({ due_date: t.due_date }));
+
+        // Generate missing instances
+        const missingInstances = generateMissingInstances(parent, existingInstances);
+
+        if (missingInstances.length > 0) {
+          console.log(`[syncRecurringTasks] Creating ${missingInstances.length} missing instances for task: ${parent.title}`);
+
+          // Create missing instances
+          for (const instance of missingInstances) {
+            await apiCreateTask(instance);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[syncRecurringTasks] Error:', err);
+    }
+  };
 
   useEffect(() => {
     if (!selectedTask) return;

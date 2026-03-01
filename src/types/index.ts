@@ -14,7 +14,7 @@ export interface Profile {
   updated_at: string;
 }
 
-export type RecurrencePattern = 'minutely' | 'daily' | 'weekly' | 'monthly';
+export type RecurrencePattern = 'daily' | 'weekly' | 'monthly';
 
 export interface Task {
   id: string;
