@@ -200,10 +200,11 @@ function ManagerDashboardInner() {
 
         console.log(`[rolloverRecurringTasks] Rolling over task: ${task.title} to ${nextDate.toISOString().split('T')[0]}`);
 
-        // Update task with new due date and reset status to todo
+        // Update task with new due date, reset status to todo, and update created_at to push to top
         await apiUpdateTask(task.id, {
           due_date: nextDate.toISOString().split('T')[0],
           status: 'todo',
+          created_at: new Date().toISOString(),
         });
       }
     } catch (err) {

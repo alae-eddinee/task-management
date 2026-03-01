@@ -22,7 +22,7 @@ import {
   Repeat
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { generateMissingInstances } from '@/lib/recurring-tasks';
+import { calculateNextOccurrence } from '@/lib/recurring-tasks';
 
 const statusOptions: { value: TaskStatus; label: string; icon: React.ReactNode }[] = [
   { value: 'todo', label: 'To Do', icon: <Clock className="w-4 h-4" /> },
@@ -108,8 +108,8 @@ function EmployeeDashboardInner() {
         return nextSelected || prevSelected;
       });
 
-      // Sync recurring tasks for this employee
-      await syncRecurringTasks(nextTasks);
+      // Roll over recurring tasks that have passed their due date
+      await rolloverRecurringTasks(nextTasks);
     } catch (err) {
       console.error('Failed to fetch tasks:', err);
     } finally {
@@ -120,39 +120,50 @@ function EmployeeDashboardInner() {
     }
   }, [profile]);
 
-  // Sync recurring tasks - generate missing instances for infinite recurrence
-  const syncRecurringTasks = async (currentTasks: Task[]) => {
+  // Roll over recurring tasks - when due date passes, move to next occurrence
+  const rolloverRecurringTasks = async (currentTasks: Task[]) => {
     try {
-      // Find recurring parent tasks assigned to this employee
-      const recurringParents = currentTasks.filter(
-        (t) => t.is_recurring && !t.parent_task_id
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Find recurring parent tasks that are past their due date
+      const recurringTasksToRollover = currentTasks.filter(
+        (t) => t.is_recurring && 
+             !t.parent_task_id && 
+             t.due_date && 
+             new Date(t.due_date) < today &&
+             t.status === 'done'
       );
 
-      if (recurringParents.length === 0) return;
+      if (recurringTasksToRollover.length === 0) return;
 
-      console.log(`[syncRecurringTasks] Found ${recurringParents.length} recurring parent tasks for employee`);
+      console.log(`[rolloverRecurringTasks] Found ${recurringTasksToRollover.length} recurring tasks to rollover`);
 
-      for (const parent of recurringParents) {
-        // Get existing instances for this parent
-        const instancesData = await apiGetTasksByParentId(parent.id);
-        const existingInstances: Array<{ due_date: string }> = instancesData
-          .filter((t): t is typeof t & { due_date: string } => t.due_date !== undefined)
-          .map((t) => ({ due_date: t.due_date }));
+      for (const task of recurringTasksToRollover) {
+        // Calculate next occurrence
+        const nextDate = calculateNextOccurrence(
+          task.due_date!,
+          task.recurrence_pattern || 'daily',
+          task.recurrence_day_of_week
+        );
 
-        // Generate missing instances
-        const missingInstances = generateMissingInstances(parent, existingInstances);
-
-        if (missingInstances.length > 0) {
-          console.log(`[syncRecurringTasks] Creating ${missingInstances.length} missing instances for task: ${parent.title}`);
-
-          // Create missing instances
-          for (const instance of missingInstances) {
-            await apiCreateTask(instance);
-          }
+        // Check if we've passed the recurrence end date
+        if (task.recurrence_end_date && nextDate > new Date(task.recurrence_end_date)) {
+          console.log(`[rolloverRecurringTasks] Task ${task.title} has reached its end date, not rolling over`);
+          continue;
         }
+
+        console.log(`[rolloverRecurringTasks] Rolling over task: ${task.title} to ${nextDate.toISOString().split('T')[0]}`);
+
+        // Update task with new due date, reset status to todo, and update created_at to push to top
+        await apiUpdateTask(task.id, {
+          due_date: nextDate.toISOString().split('T')[0],
+          status: 'todo',
+          created_at: new Date().toISOString(),
+        });
       }
     } catch (err) {
-      console.error('[syncRecurringTasks] Error:', err);
+      console.error('[rolloverRecurringTasks] Error:', err);
     }
   };
 
