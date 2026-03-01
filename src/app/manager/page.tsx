@@ -7,11 +7,10 @@ import { useAuth, useTaskNotifications } from '@/hooks';
 import { Header, StatsCard, OnlineUsers } from '@/components/layout';
 import { Button, Input, Select, Textarea, Modal, Card, Badge } from '@/components/ui';
 import { RecurringTaskSelector } from '@/components/ui/RecurringTaskSelector';
-import { generateRecurringTaskInstances, generateMissingInstances } from '@/lib/recurring-tasks';
+import { formatRecurrencePattern } from '@/lib/recurring-tasks';
 import { TaskNotificationProvider, TaskNotificationType } from '@/hooks/useTaskNotifications';
 import { TaskToastNotifications } from '@/components/ui/TaskToastNotifications';
 import { Task, Profile, TaskPriority, TaskStatus, Comment, RecurrencePattern } from '@/types';
-import { insertNotification } from '@/lib/supabase-queries';
 import { apiGetEmployees, apiGetTasks, apiCreateTask, apiUpdateTask, apiDeleteTask, apiGetComments, apiCreateComment, apiDeleteComment, apiGetTasksByParentId } from '@/lib/api-client';
 import { 
   ClipboardList, 
@@ -154,8 +153,8 @@ function ManagerDashboardInner() {
       })) as Task[];
       setTasks(mappedTasks);
 
-      // Sync recurring tasks - generate missing instances for infinite recurrence
-      await syncRecurringTasks(mappedTasks);
+      // Roll over recurring tasks that have passed their due date
+      await rolloverRecurringTasks(mappedTasks);
     } catch (err) {
       console.error('[fetchData] API error:', err);
     } finally {
@@ -166,39 +165,49 @@ function ManagerDashboardInner() {
     }
   }, [profile]);
 
-  // Sync recurring tasks - generate missing instances for infinite recurrence
-  const syncRecurringTasks = async (currentTasks: Task[]) => {
+  // Roll over recurring tasks - when due date passes, move to next occurrence
+  const rolloverRecurringTasks = async (currentTasks: Task[]) => {
     try {
-      // Find recurring parent tasks (tasks with is_recurring=true and no parent_task_id)
-      const recurringParents = currentTasks.filter(
-        t => t.is_recurring && !t.parent_task_id
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Find recurring parent tasks that are past their due date
+      const recurringTasksToRollover = currentTasks.filter(
+        t => t.is_recurring && 
+             !t.parent_task_id && 
+             t.due_date && 
+             new Date(t.due_date) < today &&
+             t.status === 'done'
       );
 
-      if (recurringParents.length === 0) return;
+      if (recurringTasksToRollover.length === 0) return;
 
-      console.log(`[syncRecurringTasks] Found ${recurringParents.length} recurring parent tasks`);
+      console.log(`[rolloverRecurringTasks] Found ${recurringTasksToRollover.length} recurring tasks to rollover`);
 
-      for (const parent of recurringParents) {
-        // Get existing instances for this parent
-        const instancesData = await apiGetTasksByParentId(parent.id);
-        const existingInstances: Array<{ due_date: string }> = instancesData
-          .filter((t): t is typeof t & { due_date: string } => t.due_date !== undefined)
-          .map((t) => ({ due_date: t.due_date }));
+      for (const task of recurringTasksToRollover) {
+        // Calculate next occurrence
+        const nextDate = calculateNextOccurrence(
+          task.due_date!,
+          task.recurrence_pattern || 'daily',
+          task.recurrence_day_of_week
+        );
 
-        // Generate missing instances
-        const missingInstances = generateMissingInstances(parent, existingInstances);
-
-        if (missingInstances.length > 0) {
-          console.log(`[syncRecurringTasks] Creating ${missingInstances.length} missing instances for task: ${parent.title}`);
-
-          // Create missing instances
-          for (const instance of missingInstances) {
-            await apiCreateTask(instance);
-          }
+        // Check if we've passed the recurrence end date
+        if (task.recurrence_end_date && nextDate > new Date(task.recurrence_end_date)) {
+          console.log(`[rolloverRecurringTasks] Task ${task.title} has reached its end date, not rolling over`);
+          continue;
         }
+
+        console.log(`[rolloverRecurringTasks] Rolling over task: ${task.title} to ${nextDate.toISOString().split('T')[0]}`);
+
+        // Update task with new due date and reset status to todo
+        await apiUpdateTask(task.id, {
+          due_date: nextDate.toISOString().split('T')[0],
+          status: 'todo',
+        });
       }
     } catch (err) {
-      console.error('[syncRecurringTasks] Error:', err);
+      console.error('[rolloverRecurringTasks] Error:', err);
     }
   };
 
@@ -457,7 +466,8 @@ function ManagerDashboardInner() {
       
       console.log('Insert successful:', newTask);
 
-      // If recurring, create the parent recurring task and generate instances
+      // If recurring, just update the task with recurring config
+      // No instances are generated upfront - task will rollover when due date arrives
       if (isRecurring && newTask) {
         const recurringConfig = {
           is_recurring: true,
@@ -470,34 +480,7 @@ function ManagerDashboardInner() {
         // Update the task to be recurring
         await apiUpdateTask(newTask[0]?.id || newTask.id, recurringConfig);
         
-        // Generate instances for the next 30 days
-        const parentTask: Task = {
-          ...taskData,
-          id: newTask[0]?.id || newTask.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          updated_by: profile.id,
-          description: taskData.description || undefined,
-          due_date: taskData.due_date || undefined,
-        };
-        
-        const instances = generateRecurringTaskInstances(
-          parentTask,
-          {
-            is_recurring: true,
-            recurrence_pattern: recurrencePattern,
-            recurrence_start_date: recurringConfig.recurrence_start_date,
-            recurrence_end_date: recurringConfig.recurrence_end_date,
-            recurrence_day_of_week: recurringConfig.recurrence_day_of_week,
-          }
-        );
-        
-        // Create instances
-        for (const instance of instances) {
-          await apiCreateTask(instance);
-        }
-        
-        console.log(`Created ${instances.length} recurring task instances`);
+        console.log('Created recurring task (no instances generated upfront)');
       }
 
       resetForm();
