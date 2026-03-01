@@ -1,7 +1,7 @@
 'use client';
 
 import type { RecurrencePattern, Task } from '@/types';
-import { addDays, addWeeks, addMonths, format, parseISO, startOfWeek, getDay } from 'date-fns';
+import { addDays, addWeeks, addMonths, addMinutes, format, parseISO, startOfWeek, getDay } from 'date-fns';
 
 export interface RecurringTaskConfig {
   is_recurring: boolean;
@@ -59,6 +59,10 @@ export function generateRecurringTaskInstances(
  * Check if an instance should be created for a given date
  */
 function shouldCreateInstance(date: Date, config: RecurringTaskConfig): boolean {
+  if (config.recurrence_pattern === 'minutely') {
+    return true; // Create instance every minute for testing
+  }
+
   if (config.recurrence_pattern === 'daily') {
     return true;
   }
@@ -81,6 +85,8 @@ function shouldCreateInstance(date: Date, config: RecurringTaskConfig): boolean 
  */
 function getNextDate(currentDate: Date, pattern: RecurrencePattern): Date {
   switch (pattern) {
+    case 'minutely':
+      return addMinutes(currentDate, 1);
     case 'daily':
       return addDays(currentDate, 1);
     case 'weekly':
@@ -113,6 +119,8 @@ export function shouldGenerateToday(task: Task): boolean {
  */
 export function formatRecurrencePattern(pattern: RecurrencePattern, dayOfWeek?: number): string {
   switch (pattern) {
+    case 'minutely':
+      return 'Every Minute (Test)';
     case 'daily':
       return 'Daily';
     case 'weekly':
