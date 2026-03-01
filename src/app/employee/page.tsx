@@ -692,7 +692,7 @@ function EmployeeDashboardInner() {
                             <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
                               {task.title}
                               {task.is_recurring && (
-                                <span className="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-white/20 text-white">
+                                <span className="inline-flex items-center ml-2 px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
                                   <Repeat className="w-3 h-3 mr-0.5" />
                                   {task.recurrence_pattern || 'daily'}
                                 </span>
@@ -795,7 +795,7 @@ function EmployeeDashboardInner() {
                         <p className={`font-medium text-sm leading-tight ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400' : ''}`}>
                           {task.title}
                           {task.is_recurring && (
-                            <span className="inline-flex items-center ml-1 px-1 py-0.5 rounded text-xs font-medium bg-white/20 text-white">
+                            <span className="inline-flex items-center ml-1 px-1 py-0.5 rounded text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
                               <Repeat className="w-3 h-3" />
                             </span>
                           )}
