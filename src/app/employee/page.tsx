@@ -18,7 +18,8 @@ import {
   Eye,
   Play,
   CheckCheck,
-  Trash2
+  Trash2,
+  Repeat
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -811,7 +812,8 @@ function EmployeeDashboardInner() {
               {selectedTask.is_recurring && (
                 <div className="flex items-center gap-2 mt-1">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
-                    � Recurring ({selectedTask.recurrence_pattern || 'daily'})
+                    <Repeat className="w-3 h-3" />
+                    Recurring ({selectedTask.recurrence_pattern || 'daily'})
                   </span>
                 </div>
               )}
@@ -844,7 +846,8 @@ function EmployeeDashboardInner() {
                   <p className="text-sm text-[var(--foreground-tertiary)]">Recurrence</p>
                   <div className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-[var(--primary)]/10 text-[var(--primary)]">
-                      🔁 Recurring ({selectedTask.recurrence_pattern || 'daily'})
+                      <Repeat className="w-3 h-3" />
+                      Recurring ({selectedTask.recurrence_pattern || 'daily'})
                     </span>
                     {selectedTask.recurrence_start_date && (
                       <span className="text-xs text-[var(--foreground-secondary)]">
