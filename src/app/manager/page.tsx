@@ -1020,9 +1020,14 @@ function ManagerDashboardInner() {
                                   </span>
                                 </td>
                                 <td className="px-1 sm:px-2 py-1.5 sm:py-2 text-right">
-                                  <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
-                                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                                  </Button>
+                                  <div className="flex items-center gap-1">
+                                    <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openDetailModal(task)}>
+                                      <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openEditModal(task)}>
+                                      <Pencil className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    </Button>
+                                  </div>
                                 </td>
                               </tr>
                             ))
@@ -1256,6 +1261,23 @@ function ManagerDashboardInner() {
               </p>
             )}
           </div>
+          
+          {/* Recurring Task Selector */}
+          <RecurringTaskSelector
+            isRecurring={isRecurring}
+            pattern={recurrencePattern}
+            startDate={recurrenceStartDate}
+            endDate={recurrenceEndDate}
+            dayOfWeek={recurrenceDayOfWeek}
+            onChange={(config) => {
+              setIsRecurring(config.isRecurring);
+              setRecurrencePattern(config.pattern);
+              setRecurrenceStartDate(config.startDate);
+              setRecurrenceEndDate(config.endDate);
+              setRecurrenceDayOfWeek(config.dayOfWeek);
+            }}
+          />
+          
           <div className="flex justify-end gap-3 pt-4">
             <Button variant="ghost" type="button" onClick={() => { setShowEditModal(false); setSelectedTask(null); resetForm(); }}>
               Cancel
