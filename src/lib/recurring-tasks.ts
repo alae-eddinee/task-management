@@ -219,3 +219,26 @@ export function generateMissingInstances(
 
   return instances;
 }
+
+/**
+ * Calculate the next occurrence date for a recurring task
+ */
+export function calculateNextOccurrence(
+  currentDueDate: string,
+  pattern: RecurrencePattern,
+  dayOfWeek?: number
+): Date {
+  const current = parseISO(currentDueDate);
+
+  switch (pattern) {
+    case 'daily':
+      return addDays(current, 1);
+    case 'weekly':
+      // Add 7 days for weekly
+      return addWeeks(current, 1);
+    case 'monthly':
+      return addMonths(current, 1);
+    default:
+      return addDays(current, 1);
+  }
+}
