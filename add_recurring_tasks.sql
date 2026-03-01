@@ -35,8 +35,3 @@ CREATE TRIGGER generate_recurring_instances
   AFTER INSERT ON tasks
   FOR EACH ROW
   EXECUTE FUNCTION generate_recurring_task_instances();
-
--- Add RLS policy for recurring tasks (same as regular tasks)
-CREATE POLICY IF NOT EXISTS "Managers can create recurring tasks" ON tasks FOR INSERT WITH CHECK (
-  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('manager', 'admin'))
-);

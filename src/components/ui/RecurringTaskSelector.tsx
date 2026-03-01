@@ -87,10 +87,10 @@ export function RecurringTaskSelector({
 
       {/* Options Panel */}
       {showOptions && isRecurring && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 space-y-4">
+        <div className="p-4 bg-[var(--background-secondary)] rounded-lg border border-[var(--border)] space-y-4">
           {/* Pattern Selection */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
               Repeat
             </label>
             <div className="flex gap-2 flex-wrap">
@@ -109,8 +109,8 @@ export function RecurringTaskSelector({
                   }
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     pattern === p
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      ? 'bg-[var(--primary)] text-white'
+                      : 'bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--background-tertiary)]'
                   }`}
                 >
                   {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -122,7 +122,7 @@ export function RecurringTaskSelector({
           {/* Day of Week (for weekly pattern) */}
           {pattern === 'weekly' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
                 On day
               </label>
               <div className="flex gap-1 flex-wrap">
@@ -141,8 +141,8 @@ export function RecurringTaskSelector({
                     }
                     className={`w-10 h-10 rounded-md text-xs font-medium transition-colors ${
                       dayOfWeek === day.value
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        ? 'bg-[var(--primary)] text-white'
+                        : 'bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] hover:bg-[var(--background-tertiary)]'
                     }`}
                   >
                     {day.label}
@@ -154,7 +154,7 @@ export function RecurringTaskSelector({
 
           {/* Start Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
               <Calendar className="w-4 h-4 inline mr-1" />
               Start Date
             </label>
@@ -170,13 +170,13 @@ export function RecurringTaskSelector({
                   dayOfWeek,
                 })
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
             />
           </div>
 
           {/* End Date (optional) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
               <Calendar className="w-4 h-4 inline mr-1" />
               End Date (optional)
             </label>
@@ -193,7 +193,7 @@ export function RecurringTaskSelector({
                     dayOfWeek,
                   })
                 }
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm"
+                className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md bg-[var(--background)] text-[var(--foreground)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               />
               {endDate && (
                 <button
@@ -206,13 +206,13 @@ export function RecurringTaskSelector({
                       dayOfWeek,
                     })
                   }
-                  className="px-3 py-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+                  className="px-3 py-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
             </div>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
               Leave empty to repeat indefinitely
             </p>
           </div>
