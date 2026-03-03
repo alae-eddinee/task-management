@@ -124,8 +124,15 @@ function EmployeeDashboardInner() {
   const rolloverRecurringTasks = useCallback(async (currentTasks: Task[]) => {
     try {
       const today = startOfDay(new Date());
+      console.log(`[rolloverRecurringTasks] Today: ${today.toISOString()}, Checking ${currentTasks.length} tasks`);
 
-      // Find recurring parent tasks that are past their due date
+      // Log all recurring tasks for debugging
+      const recurringTasks = currentTasks.filter(t => t.is_recurring);
+      console.log(`[rolloverRecurringTasks] Found ${recurringTasks.length} recurring tasks total:`);
+      recurringTasks.forEach(t => {
+        console.log(`  - ${t.title}: due=${t.due_date}, status=${t.status}, is_recurring=${t.is_recurring}, pattern=${t.recurrence_pattern}`);
+      });
+
       const recurringTasksToRollover = currentTasks.filter(
         (t) => t.is_recurring && 
              !t.parent_task_id && 
@@ -134,7 +141,16 @@ function EmployeeDashboardInner() {
              t.status === 'done'
       );
 
-      if (recurringTasksToRollover.length === 0) return;
+      console.log(`[rolloverRecurringTasks] Filtered to ${recurringTasksToRollover.length} tasks to rollover:`);
+      recurringTasksToRollover.forEach(t => {
+        const dueDate = startOfDay(new Date(t.due_date!));
+        console.log(`  - ${t.title}: due=${t.due_date} (startOfDay: ${dueDate.toISOString()}), today=${today.toISOString()}, due < today = ${dueDate < today}`);
+      });
+
+      if (recurringTasksToRollover.length === 0) {
+        console.log('[rolloverRecurringTasks] No tasks to rollover');
+        return;
+      }
 
       console.log(`[rolloverRecurringTasks] Found ${recurringTasksToRollover.length} recurring tasks to rollover`);
 
