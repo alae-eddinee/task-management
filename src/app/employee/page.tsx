@@ -133,18 +133,19 @@ function EmployeeDashboardInner() {
         console.log(`  - ${t.title}: due=${t.due_date}, status=${t.status}, is_recurring=${t.is_recurring}, pattern=${t.recurrence_pattern}`);
       });
 
+      // Find recurring parent tasks that are past their due date or have no due date but are done
       const recurringTasksToRollover = currentTasks.filter(
         (t) => t.is_recurring && 
              !t.parent_task_id && 
-             t.due_date && 
-             startOfDay(new Date(t.due_date)) < today &&
-             t.status === 'done'
+             t.status === 'done' &&
+             // Either has a due date in the past, OR has no due date at all (use start date as base)
+             (!t.due_date || startOfDay(new Date(t.due_date)) < today)
       );
 
       console.log(`[rolloverRecurringTasks] Filtered to ${recurringTasksToRollover.length} tasks to rollover:`);
       recurringTasksToRollover.forEach(t => {
-        const dueDate = startOfDay(new Date(t.due_date!));
-        console.log(`  - ${t.title}: due=${t.due_date} (startOfDay: ${dueDate.toISOString()}), today=${today.toISOString()}, due < today = ${dueDate < today}`);
+        const dueDate = t.due_date ? startOfDay(new Date(t.due_date)) : null;
+        console.log(`  - ${t.title}: due=${t.due_date} (startOfDay: ${dueDate?.toISOString()}), today=${today.toISOString()}, hasDueDate=${!!t.due_date}`);
       });
 
       if (recurringTasksToRollover.length === 0) {
@@ -155,9 +156,12 @@ function EmployeeDashboardInner() {
       console.log(`[rolloverRecurringTasks] Found ${recurringTasksToRollover.length} recurring tasks to rollover`);
 
       for (const task of recurringTasksToRollover) {
-        // Calculate next occurrence
+        // For tasks with no due_date, use recurrence_start_date or created_at as base
+        const baseDate = task.due_date || task.recurrence_start_date || task.created_at;
+        
+        // Calculate next occurrence from the base date
         const nextDate = calculateNextOccurrence(
-          task.due_date!,
+          baseDate,
           task.recurrence_pattern || 'daily',
           task.recurrence_day_of_week
         );
@@ -168,7 +172,7 @@ function EmployeeDashboardInner() {
           continue;
         }
 
-        console.log(`[rolloverRecurringTasks] Rolling over task: ${task.title} to ${nextDate.toISOString().split('T')[0]}`);
+        console.log(`[rolloverRecurringTasks] Rolling over task: ${task.title} to ${nextDate.toISOString().split('T')[0]} (baseDate was: ${baseDate})`);
 
         // Update task with new due date, reset status to todo, and update created_at to push to top
         await apiUpdateTask(task.id, {
