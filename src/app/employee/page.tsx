@@ -923,9 +923,28 @@ function EmployeeDashboardInner() {
             <div className="grid grid-cols-2 gap-4 py-4 border-y border-[var(--border)]">
               <div>
                 <p className="text-sm text-[var(--foreground-tertiary)]">Status</p>
-                <Badge variant={statusBadgeVariant[selectedTask.status]}>
-                  {selectedTask.status === 'in_progress' ? 'In Progress' : selectedTask.status === 'todo' ? 'To Do' : 'Done'}
-                </Badge>
+                <select
+                  value={selectedTask.status}
+                  onChange={(e) => handleStatusChange(selectedTask.id, e.target.value as TaskStatus)}
+                  disabled={mutatingTaskIds.has(selectedTask.id)}
+                  className={`mt-1 px-3 py-1.5 rounded-md text-sm font-medium border cursor-pointer focus:ring-2 focus:ring-[var(--primary)] appearance-none bg-no-repeat pr-8 ${
+                    selectedTask.status === 'done' ? 'bg-green-500 text-white border-transparent' :
+                    selectedTask.status === 'todo' ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200 border-transparent' :
+                    'bg-blue-500 text-white dark:bg-blue-600 border-transparent'
+                  }`}
+                  style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.5rem center', backgroundSize: '1.5em 1.5em' }}
+                >
+                  {statusOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value} className="bg-white text-gray-900">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                {mutatingTaskIds.has(selectedTask.id) && (
+                  <span className="inline-block align-middle ml-2">
+                    <span className="inline-block animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+                  </span>
+                )}
               </div>
               <div>
                 <p className="text-sm text-[var(--foreground-tertiary)]">Due Date</p>
