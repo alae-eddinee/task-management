@@ -21,7 +21,7 @@ import {
   Trash2,
   Repeat
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isSameDay, startOfDay } from 'date-fns';
 import { calculateNextOccurrence } from '@/lib/recurring-tasks';
 
 const statusOptions: { value: TaskStatus; label: string; icon: React.ReactNode }[] = [
@@ -121,17 +121,16 @@ function EmployeeDashboardInner() {
   }, [profile]);
 
   // Roll over recurring tasks - when due date passes, move to next occurrence
-  const rolloverRecurringTasks = async (currentTasks: Task[]) => {
+  const rolloverRecurringTasks = useCallback(async (currentTasks: Task[]) => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = startOfDay(new Date());
 
       // Find recurring parent tasks that are past their due date
       const recurringTasksToRollover = currentTasks.filter(
         (t) => t.is_recurring && 
              !t.parent_task_id && 
              t.due_date && 
-             new Date(t.due_date) < today &&
+             startOfDay(new Date(t.due_date)) < today &&
              t.status === 'done'
       );
 
@@ -162,10 +161,13 @@ function EmployeeDashboardInner() {
           created_at: new Date().toISOString(),
         });
       }
+      
+      // Refresh tasks after rollover
+      await fetchTasks(true);
     } catch (err) {
       console.error('[rolloverRecurringTasks] Error:', err);
     }
-  };
+  }, [fetchTasks]);
 
   useEffect(() => {
     if (!selectedTask) return;
@@ -323,6 +325,18 @@ function EmployeeDashboardInner() {
       channel.unsubscribe();
     };
   }, [profile, fetchTasks, debounce, addNotification]);
+
+  // Periodic rollover check - run every minute to catch tasks that need rollover without page refresh
+  useEffect(() => {
+    if (!profile) return;
+    
+    const intervalId = setInterval(() => {
+      console.log('[Periodic Rollover] Checking for recurring tasks to rollover...');
+      rolloverRecurringTasks(tasks);
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(intervalId);
+  }, [profile, tasks, rolloverRecurringTasks]);
 
   // Real-time subscription for comments with notifications
   useEffect(() => {
