@@ -893,12 +893,13 @@ function ManagerDashboardInner() {
               <table className="w-full min-w-[640px]">
                 <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)] sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[28%]">Task</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[25%]">Task</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[18%]">Assigned</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[12%]">Priority</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[14%]">Status</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[10%]">Due</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[18%]">Actions</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[12%]">Created</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[10%]">Days Ago</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[11%]">Actions</th>
                   </tr>
                 </thead>
               </table>
@@ -907,7 +908,7 @@ function ManagerDashboardInner() {
                   <tbody className="divide-y divide-[var(--border)]">
                     {sortedTasks.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
+                        <td colSpan={7} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
                           No tasks found. Create your first task!
                         </td>
                       </tr>
@@ -920,7 +921,7 @@ function ManagerDashboardInner() {
                               ? 'bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30'
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
-                          <td className="px-4 py-3 relative w-[28%]">
+                          <td className="px-4 py-3 relative w-[25%]">
                             <div>
                                 <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-600 dark:text-red-400 font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
                                   {task.title}
@@ -931,20 +932,10 @@ function ManagerDashboardInner() {
                                     </span>
                                   )}
                                 </p>
-                                <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900 font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
-                                  Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
-                                </p>
                               </div>
                           </td>
                           <td className={`px-4 py-3 text-sm w-[18%] ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
                             {task.assigned_to_name || 'Unknown'}
-                          </td>
-                          <td className="px-4 py-3 w-[12%] text-center">
-                            {task.priority === 'bombe' && (
-                              <span className={task.status === 'done' ? 'line-through opacity-60' : ''}>
-                                <Badge variant="danger">🚨 BOMBE</Badge>
-                              </span>
-                            )}
                           </td>
                           <td className="px-4 py-3 w-[14%] text-center">
                             <Badge variant={statusBadgeVariant[task.status]}>
@@ -954,7 +945,15 @@ function ManagerDashboardInner() {
                           <td className={`px-4 py-3 text-sm w-[10%] text-center ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-[var(--foreground-secondary)]'}`}>
                             {task.due_date ? format(new Date(task.due_date), 'MMM d') : '-'}
                           </td>
-                          <td className="px-4 py-3 w-[18%]">
+                          <td className={`px-4 py-3 text-sm w-[12%] text-center ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
+                            {format(new Date(task.created_at), 'MMM d, yyyy')}
+                          </td>
+                          <td className={`px-4 py-3 text-sm w-[10%] text-center ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
+                            <span className={`font-bold ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900' : 'text-[var(--foreground-secondary)]'}`}>
+                              {differenceInDays(new Date(), new Date(task.created_at))} days
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 w-[11%]">
                             <div className="flex items-center justify-end gap-2">
                               <Button variant="ghost" size="sm" className="p-2" onClick={() => openDetailModal(task)}>
                                 <Eye className="w-4 h-4" />
