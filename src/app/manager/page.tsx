@@ -1006,7 +1006,7 @@ function ManagerDashboardInner() {
                           )}
                         </p>
                         <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900 font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
-                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
+                          {format(new Date(task.created_at), 'MMM d, yyyy')} • {differenceInDays(new Date(), new Date(task.created_at))} days ago
                         </p>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
