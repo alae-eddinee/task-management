@@ -834,7 +834,7 @@ function EmployeeDashboardInner() {
                             </span>
                           )}
                         </p>
-                        <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold drop-shadow-md' : 'text-[var(--foreground-tertiary)]'}`}>
+                        <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900 font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
                           Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                         </p>
                         {task.description && (
