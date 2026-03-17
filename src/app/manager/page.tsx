@@ -934,9 +934,6 @@ function ManagerDashboardInner() {
                                 <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900 font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
                                   Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                                 </p>
-                                {task.description && (
-                                  <p className={`text-sm text-[var(--foreground-tertiary)] truncate max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
-                                )}
                               </div>
                           </td>
                           <td className={`px-4 py-3 text-sm w-[18%] ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-[var(--foreground-secondary)]'}`}>
@@ -1012,11 +1009,6 @@ function ManagerDashboardInner() {
                         <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900 font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
                           Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                         </p>
-                        {task.description && (
-                          <p className={`text-xs mt-0.5 line-clamp-1 ${task.status === 'done' ? 'line-through' : 'text-[var(--foreground-tertiary)]'}`}>
-                            {task.description}
-                          </p>
-                        )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {task.priority === 'bombe' && task.status !== 'done' && (

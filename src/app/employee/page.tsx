@@ -834,14 +834,9 @@ function EmployeeDashboardInner() {
                             </span>
                           )}
                         </p>
-                        <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900 font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
-                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
+                        <p className={`text-sm font-bold ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900' : 'text-[var(--foreground-tertiary)]'}`}>
+                          {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                         </p>
-                        {task.description && (
-                          <p className={`text-xs mt-0.5 line-clamp-1 ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>
-                            {task.description}
-                          </p>
-                        )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {task.priority === 'bombe' && task.status !== 'done' && (
