@@ -696,10 +696,9 @@ function EmployeeDashboardInner() {
               <table className="w-full">
                 <thead className="bg-[var(--background-tertiary)] border-b border-[var(--border)] sticky top-0 z-10">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[30%]">Task</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[35%]">Task</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[15%]">Status</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[12%]">Due</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[15%]">Created</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[12%]">Days Ago</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--foreground-secondary)] uppercase w-[16%]">View</th>
                   </tr>
@@ -710,7 +709,7 @@ function EmployeeDashboardInner() {
                   <tbody className="divide-y divide-[var(--border)]">
                     {sortedTasks.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
+                        <td colSpan={5} className="px-4 py-8 text-center text-[var(--foreground-tertiary)]">
                           No tasks assigned to you yet.
                         </td>
                       </tr>
@@ -732,6 +731,9 @@ function EmployeeDashboardInner() {
                                   {task.recurrence_pattern || 'daily'}
                                 </span>
                               )}
+                            </p>
+                            <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground-tertiary)]'}`}>
+                              Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
                             </p>
                           </td>
                           <td className="px-4 py-3">
@@ -770,11 +772,6 @@ function EmployeeDashboardInner() {
                             ) : (
                               <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'}>-</span>
                             )}
-                          </td>
-                          <td className={`px-4 py-3 text-sm text-center ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
-                            <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground-secondary)]'}>
-                              {format(new Date(task.created_at), 'MMM d, yyyy')}
-                            </span>
                           </td>
                           <td className={`px-4 py-3 text-sm text-center ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
                             <span className={`font-bold ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900' : 'text-[var(--foreground-secondary)]'}`}>
