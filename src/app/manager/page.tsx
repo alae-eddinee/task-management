@@ -26,7 +26,7 @@ import {
   Search,
   Repeat
 } from 'lucide-react';
-import { format, isSameDay, startOfDay } from 'date-fns';
+import { format, isSameDay, startOfDay, differenceInDays } from 'date-fns';
 
 const priorityOptions = [
   { value: 'bombe', label: '🚨 BOMBE (Urgent)' },
@@ -932,7 +932,7 @@ function ManagerDashboardInner() {
                                   )}
                                 </p>
                                 <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
-                                  Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                                  Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                                 </p>
                                 {task.description && (
                                   <p className={`text-sm text-[var(--foreground-tertiary)] truncate max-w-xs ${task.status === 'done' ? 'line-through' : ''}`}>{task.description}</p>
@@ -1010,7 +1010,7 @@ function ManagerDashboardInner() {
                           )}
                         </p>
                         <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-700 dark:text-red-300' : 'text-[var(--foreground-tertiary)]'}`}>
-                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                         </p>
                         {task.description && (
                           <p className={`text-xs mt-0.5 line-clamp-1 ${task.status === 'done' ? 'line-through' : 'text-[var(--foreground-tertiary)]'}`}>
@@ -1542,7 +1542,7 @@ function ManagerDashboardInner() {
 
             <div className="text-sm text-[var(--foreground-tertiary)]">
               <MessageSquare className="w-4 h-4 inline mr-1" />
-              Created {format(new Date(selectedTask.created_at), 'MMM d, yyyy h:mm a')}
+              Created {format(new Date(selectedTask.created_at), 'MMM d, yyyy h:mm a')} ({differenceInDays(new Date(), new Date(selectedTask.created_at))} days ago)
             </div>
           </div>
         )}

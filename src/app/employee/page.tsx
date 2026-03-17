@@ -21,7 +21,7 @@ import {
   Trash2,
   Repeat
 } from 'lucide-react';
-import { format, isSameDay, startOfDay } from 'date-fns';
+import { format, isSameDay, startOfDay, differenceInDays } from 'date-fns';
 import { calculateNextOccurrence } from '@/lib/recurring-tasks';
 
 const statusOptions: { value: TaskStatus; label: string; icon: React.ReactNode }[] = [
@@ -835,7 +835,7 @@ function EmployeeDashboardInner() {
                           )}
                         </p>
                         <p className={`text-xs ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white' : 'text-[var(--foreground-tertiary)]'}`}>
-                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
+                          Created: {format(new Date(task.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(task.created_at))} days ago)
                         </p>
                         {task.description && (
                           <p className={`text-xs mt-0.5 line-clamp-1 ${task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'} ${task.status === 'done' ? 'line-through' : ''}`}>
@@ -956,7 +956,7 @@ function EmployeeDashboardInner() {
               </div>
               <div>
                 <p className="text-sm text-[var(--foreground-tertiary)]">Created</p>
-                <p className="font-medium">{format(new Date(selectedTask.created_at), 'MMM d, yyyy')}</p>
+                <p className="font-medium">{format(new Date(selectedTask.created_at), 'MMM d, yyyy')} ({differenceInDays(new Date(), new Date(selectedTask.created_at))} days ago)</p>
               </div>
               {selectedTask.is_recurring && (
                 <div className="col-span-2">
