@@ -722,7 +722,7 @@ function EmployeeDashboardInner() {
                               ? 'bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800'
                               : 'hover:bg-[var(--background-secondary)]'
                         }`}>
-                          <td className="px-4 py-3 relative">
+                          <td className="px-4 py-3 relative w-[35%]">
                             <p className={`font-medium text-base ${task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : 'text-[var(--foreground)]'} ${task.status === 'done' ? 'line-through text-gray-400 dark:text-gray-500' : ''}`}>
                               {task.title}
                               {task.is_recurring && (
@@ -736,7 +736,7 @@ function EmployeeDashboardInner() {
                               Created: {format(new Date(task.created_at), 'MMM d, yyyy')}
                             </p>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-[15%]">
                             <div className="flex items-center justify-center">
                               <select
                                 value={task.status}
@@ -764,7 +764,7 @@ function EmployeeDashboardInner() {
                               )}
                             </div>
                           </td>
-                          <td className={`px-4 py-3 text-sm text-center ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
+                          <td className={`px-4 py-3 text-sm text-center w-[12%] ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
                             {task.due_date ? (
                               <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-white font-bold' : new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-[var(--danger)] font-bold' : 'text-[var(--foreground-secondary)]'}>
                                 {format(new Date(task.due_date), 'MMM d')}
@@ -773,12 +773,12 @@ function EmployeeDashboardInner() {
                               <span className={task.priority === 'bombe' && task.status !== 'done' ? 'text-red-100' : 'text-[var(--foreground-tertiary)]'}>-</span>
                             )}
                           </td>
-                          <td className={`px-4 py-3 text-sm text-center ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
+                          <td className={`px-4 py-3 text-sm text-center w-[12%] ${task.status === 'done' ? 'text-gray-400 line-through' : ''}`}>
                             <span className={`font-bold ${task.priority === 'bombe' && task.status !== 'done' ? 'text-gray-900' : 'text-[var(--foreground-secondary)]'}`}>
                               {differenceInDays(new Date(), new Date(task.created_at))} days
                             </span>
                           </td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 w-[16%]">
                             <div className="flex items-center justify-center">
                               <Button 
                                 variant={task.priority === 'bombe' && task.status !== 'done' ? 'ghost' : 'ghost'} 
