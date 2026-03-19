@@ -7,9 +7,13 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const getSessionExpiry = () => {
   if (typeof window === 'undefined') return undefined;
   const rememberMe = localStorage.getItem('rememberMe');
-  // If remember me is enabled (default), use 30 days, otherwise use 1 day
-  const days = rememberMe !== 'false' ? 30 : 1;
-  return days * 24 * 60 * 60; // Convert to seconds
+  // If remember me is enabled (default), session never expires
+  // If disabled, use 1 day
+  if (rememberMe === 'false') {
+    return 24 * 60 * 60; // 1 day
+  }
+  // Essentially never expire (10 years)
+  return 10 * 365 * 24 * 60 * 60;
 };
 
 // Singleton instance for general use (backwards compat)
