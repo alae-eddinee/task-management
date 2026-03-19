@@ -11,7 +11,7 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string, rememberMe?: boolean) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, rememberMe: boolean = true) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -137,6 +137,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error(error.message) };
     }
 
+    // Store remember me preference in localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rememberMe', rememberMe.toString());
+    }
+
     return { error: null };
   };
 
@@ -144,6 +149,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('[useAuth] Signing out...');
     // Clear custom token first
     setAuthToken(null);
+    // Clear remember me preference
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('rememberMe');
+    }
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('[useAuth] Sign out error:', error.message);

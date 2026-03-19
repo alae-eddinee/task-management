@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, profile, loading: authLoading } = useAuth();
@@ -40,7 +41,7 @@ export default function LoginPage() {
     setLoading(true);
     loginAttempted.current = true;
 
-    const { error } = await signIn(email, password);
+    const { error } = await signIn(email, password, rememberMe);
 
     if (error) {
       setError(error.message);
@@ -88,6 +89,16 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
           />
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+            />
+            <span className="text-sm text-[var(--foreground-secondary)]">Remember me on this device</span>
+          </label>
 
           {error && (
             <p className="text-sm text-[var(--danger)] text-center">{error}</p>
