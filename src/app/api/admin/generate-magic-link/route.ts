@@ -6,6 +6,15 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export async function POST(request: Request) {
   try {
+    // Check if service role key is configured
+    if (!supabaseServiceKey) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not set');
+      return NextResponse.json(
+        { error: 'Server configuration error: Missing service role key' },
+        { status: 500 }
+      );
+    }
+
     const { email } = await request.json();
 
     if (!email) {
@@ -42,7 +51,7 @@ export async function POST(request: Request) {
     if (linkError || !linkData) {
       console.error('Failed to generate magic link:', linkError);
       return NextResponse.json(
-        { error: 'Failed to generate magic link' },
+        { error: linkError?.message || 'Failed to generate magic link' },
         { status: 500 }
       );
     }
@@ -66,10 +75,10 @@ export async function POST(request: Request) {
     const magicLink = `${baseUrl}/auth/confirm?token=${hashed_token}&type=magiclink&next=${redirectPath}`;
 
     return NextResponse.json({ magicLink });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating magic link:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error?.message || 'Internal server error' },
       { status: 500 }
     );
   }
