@@ -1,13 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Card } from '@/components/ui';
 
-export const dynamic = 'force-dynamic';
-
-export default function AuthConfirmPage() {
+function AuthConfirmContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState('');
@@ -24,10 +23,8 @@ export default function AuthConfirmPage() {
       return;
     }
 
-    // Verify the magic link token and sign in
     const verifyMagicLink = async () => {
       try {
-        // Exchange the token for a session
         const { error: verifyError } = await supabase.auth.verifyOtp({
           token_hash: token,
           type: 'magiclink',
@@ -40,7 +37,6 @@ export default function AuthConfirmPage() {
           return;
         }
 
-        // Successfully logged in, redirect to the dashboard
         router.push(next);
       } catch (err) {
         console.error('Error verifying magic link:', err);
@@ -80,4 +76,19 @@ export default function AuthConfirmPage() {
   }
 
   return null;
+}
+
+export default function AuthConfirmPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center p-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)] mx-auto mb-4" />
+          <p className="text-[var(--foreground-secondary)]">Loading...</p>
+        </Card>
+      </div>
+    }>
+      <AuthConfirmContent />
+    </Suspense>
+  );
 }
