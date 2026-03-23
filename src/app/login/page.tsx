@@ -35,8 +35,9 @@ export default function LoginPage() {
         if (profileCheckAttempts.current < 10) {
           profileCheckAttempts.current++;
           const timer = setTimeout(() => {
-            // Force re-check by triggering a state update
-            setLoading(prev => prev);
+            // Force re-check by toggling loading state
+            setLoading(true);
+            setTimeout(() => setLoading(false), 50);
           }, 500);
           return () => clearTimeout(timer);
         } else {
@@ -48,6 +49,7 @@ export default function LoginPage() {
         }
       } else if (loginAttempted.current && !user) {
         // No user session - actual login failure
+        setError('Login failed. Please check your credentials and try again.');
         setLoading(false);
         loginAttempted.current = false;
       }
