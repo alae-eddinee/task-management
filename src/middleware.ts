@@ -40,7 +40,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Public routes - redirect to appropriate dashboard if already logged in
-  if (pathname === '/' || pathname === '/login') {
+  if (pathname === '/' || pathname === '/login' || pathname.startsWith('/auth/confirm')) {
     if (user) {
       // Fetch profile to determine redirect
       const { data: profile } = await supabase
