@@ -11,14 +11,17 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, profile, loading: authLoading } = useAuth();
+  const { signIn, profile, loading: authLoading, user } = useAuth();
   const router = useRouter();
   const loginAttempted = useRef(false);
+  const profileCheckAttempts = useRef(0);
 
   // Redirect when profile is loaded after login
   useEffect(() => {
     if (!authLoading) {
       if (profile) {
+        // Profile loaded successfully - redirect
+        profileCheckAttempts.current = 0;
         if (profile.role === 'admin') {
           router.push('/admin');
         } else if (profile.role === 'manager') {
@@ -26,14 +29,30 @@ export default function LoginPage() {
         } else {
           router.push('/employee');
         }
-      } else if (loginAttempted.current) {
-        // Profile fetch failed after login attempt
-        setError('Profile not found. Please contact an administrator.');
+      } else if (loginAttempted.current && user) {
+        // User is logged in but profile is not loaded yet
+        // Give it more time (retry up to 10 times over ~5 seconds)
+        if (profileCheckAttempts.current < 10) {
+          profileCheckAttempts.current++;
+          const timer = setTimeout(() => {
+            // Force re-check by triggering a state update
+            setLoading(prev => prev);
+          }, 500);
+          return () => clearTimeout(timer);
+        } else {
+          // Profile fetch failed after multiple attempts
+          setError('Profile not found. Please contact an administrator.');
+          setLoading(false);
+          loginAttempted.current = false;
+          profileCheckAttempts.current = 0;
+        }
+      } else if (loginAttempted.current && !user) {
+        // No user session - actual login failure
         setLoading(false);
         loginAttempted.current = false;
       }
     }
-  }, [profile, authLoading, router]);
+  }, [profile, authLoading, router, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

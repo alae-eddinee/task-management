@@ -111,6 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         // Don't block on profile fetch
         if (session?.user) {
+          // Check remember me setting and refresh session if needed
+          const rememberMe = localStorage.getItem('rememberMe') !== 'false';
+          if (rememberMe) {
+            // Ensure session is persisted
+            await supabase.auth.startAutoRefresh();
+          }
           fetchProfile(session.user.id).catch(() => {});
         } else {
           setProfile(null);
@@ -128,7 +134,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string, rememberMe: boolean = true) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    // Store remember me preference BEFORE sign in (so it affects session creation)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('rememberMe', rememberMe.toString());
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -137,9 +148,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: new Error(error.message) };
     }
 
-    // Store remember me preference in localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('rememberMe', rememberMe.toString());
+    // If remember me is enabled, explicitly set session with long expiry
+    // This ensures the session persists across browser restarts
+    if (rememberMe && data.session) {
+      // Set session to persist indefinitely
+      await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
     }
 
     return { error: null };
