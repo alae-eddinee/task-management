@@ -30,20 +30,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Verify the user is a manager or admin
-    if (userData.role !== 'manager' && userData.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Magic links can only be generated for managers and admins' },
-        { status: 403 }
-      );
-    }
-
     // Use Supabase's built-in generateLink API to create a magic link
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email: email,
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/manager`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/confirm`,
       },
     });
 
@@ -59,9 +51,19 @@ export async function POST(request: Request) {
     // We return the properties needed to construct the final URL
     const { hashed_token } = linkData.properties;
     
+    // Get role for redirect path
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userData.id)
+      .single();
+
+    const role = profile?.role || 'employee';
+    const redirectPath = role === 'admin' ? '/admin' : role === 'manager' ? '/manager' : '/employee';
+
     // Construct the magic link URL that goes to our API first
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const magicLink = `${baseUrl}/auth/confirm?token=${hashed_token}&type=magiclink&next=/manager`;
+    const magicLink = `${baseUrl}/auth/confirm?token=${hashed_token}&type=magiclink&next=${redirectPath}`;
 
     return NextResponse.json({ magicLink });
   } catch (error) {

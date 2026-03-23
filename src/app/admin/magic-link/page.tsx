@@ -1,27 +1,63 @@
 'use client';
 
-import { useState } from 'react';
-import { Button, Input, Card } from '@/components/ui';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button, Card, Select } from '@/components/ui';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/hooks';
+import type { Profile } from '@/types';
+import { ArrowLeft, Link2 } from 'lucide-react';
 
 export default function MagicLinkGenerator() {
-  const [email, setEmail] = useState('');
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [magicLink, setMagicLink] = useState('');
   const [loading, setLoading] = useState(false);
+  const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
+  const router = useRouter();
+  const { profile } = useAuth();
+
+  useEffect(() => {
+    if (!profile) return;
+    
+    const fetchUsers = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name', { ascending: true });
+      
+      if (!error && data) {
+        setUsers(data as Profile[]);
+      }
+      setFetchLoading(false);
+    };
+    
+    fetchUsers();
+  }, [profile]);
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedUserId) return;
+    
     setLoading(true);
     setError('');
     setMagicLink('');
     setCopied(false);
 
+    const selectedUser = users.find(u => u.id === selectedUserId);
+    if (!selectedUser) {
+      setError('User not found');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/generate-magic-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: selectedUser.email }),
       });
 
       const data = await response.json();
@@ -44,23 +80,43 @@ export default function MagicLinkGenerator() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const userOptions = users.map(user => ({
+    value: user.id,
+    label: `${user.full_name} (${user.email}) - ${user.role}`,
+  }));
+
+  if (fetchLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--primary)]" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen p-8">
+    <div className="min-h-screen p-8 bg-[var(--background-secondary)]">
       <Card className="max-w-2xl mx-auto">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold">Magic Link Generator</h1>
-          <p className="text-[var(--foreground-secondary)] mt-2">
-            Generate direct login links for managers
-          </p>
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" onClick={() => router.push('/admin')}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Magic Link Generator</h1>
+            <p className="text-[var(--foreground-secondary)]">
+              Generate direct login links for any user
+            </p>
+          </div>
         </div>
 
         <form onSubmit={handleGenerate} className="space-y-4">
-          <Input
-            label="Manager Email"
-            type="email"
-            placeholder="Enter manager's email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+          <Select
+            label="Select User"
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            options={[
+              { value: '', label: 'Choose a user...' },
+              ...userOptions,
+            ]}
             required
           />
 
@@ -68,7 +124,13 @@ export default function MagicLinkGenerator() {
             <p className="text-sm text-[var(--danger)]">{error}</p>
           )}
 
-          <Button type="submit" className="w-full" loading={loading}>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            loading={loading}
+            disabled={!selectedUserId}
+          >
+            <Link2 className="w-4 h-4 mr-2" />
             Generate Magic Link
           </Button>
         </form>
@@ -88,7 +150,7 @@ export default function MagicLinkGenerator() {
               </Button>
             </div>
             <p className="text-xs text-[var(--foreground-tertiary)] mt-2">
-              Share this link with the manager. They can use it once to log in directly.
+              Share this link with the user. They can use it once to log in directly without a password.
             </p>
           </div>
         )}

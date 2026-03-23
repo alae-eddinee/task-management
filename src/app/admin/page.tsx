@@ -12,7 +12,8 @@ import {
   UserPlus,
   Pencil,
   Trash2,
-  Shield
+  Shield,
+  Link
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -226,10 +227,16 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Admin Dashboard</h1>
             <p className="text-[var(--foreground-secondary)]">Manage users and system settings</p>
           </div>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <UserPlus className="w-4 h-4" />
-            Create User
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => router.push('/admin/magic-link')}>
+              <Link className="w-4 h-4" />
+              Magic Links
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <UserPlus className="w-4 h-4" />
+              Create User
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
