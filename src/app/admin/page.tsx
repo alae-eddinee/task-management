@@ -13,7 +13,9 @@ import {
   Pencil,
   Trash2,
   Shield,
-  Link
+  Link,
+  LogOut,
+  KeyRound
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -38,7 +40,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
   
   // Form state
   const [fullName, setFullName] = useState('');
@@ -201,6 +206,56 @@ export default function AdminDashboard() {
     setShowEditModal(true);
   };
 
+  const openResetPasswordModal = (user: Profile) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setFormError('');
+    setShowResetPasswordModal(true);
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !newPassword.trim()) {
+      setFormError('Password is required');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setFormError('Password must be at least 6 characters');
+      return;
+    }
+
+    setResetPasswordLoading(true);
+    setFormError('');
+
+    try {
+      const response = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          newPassword: newPassword,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setFormError(result.error || 'Failed to reset password');
+        setResetPasswordLoading(false);
+        return;
+      }
+
+      // Success - close modal and show confirmation
+      setShowResetPasswordModal(false);
+      setSelectedUser(null);
+      setNewPassword('');
+      alert(`Password reset successful for ${selectedUser.full_name}. They will need to log in with the new password. All their existing sessions have been invalidated.`);
+    } catch (err) {
+      setFormError('Network error. Please try again.');
+      setResetPasswordLoading(false);
+    }
+  };
+
   const stats = {
     total: users.length,
     admins: users.filter(u => u.role === 'admin').length,
@@ -333,6 +388,15 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-3 sm:px-4 py-2 sm:py-3">
                         <div className="flex items-center justify-end gap-1 sm:gap-2">
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="p-1 sm:p-2" 
+                            onClick={() => openResetPasswordModal(user)}
+                            title="Reset Password & Force Logout"
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </Button>
                           <Button variant="ghost" size="sm" className="p-1 sm:p-2" onClick={() => openEditModal(user)}>
                             <Pencil className="w-4 h-4" />
                           </Button>
@@ -433,6 +497,35 @@ export default function AdminDashboard() {
             </Button>
             <Button type="submit" loading={formLoading}>
               Update User
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal isOpen={showResetPasswordModal} onClose={() => { setShowResetPasswordModal(false); setSelectedUser(null); setNewPassword(''); }} title={`Reset Password - ${selectedUser?.full_name}`} size="md">
+        <form onSubmit={handleResetPassword} className="space-y-4">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+            <strong>Warning:</strong> This will change the user&apos;s password and invalidate all their active sessions across all devices. They will need to log in again with the new password.
+          </div>
+          <Input
+            label="New Password"
+            type="password"
+            placeholder="Enter new password (min 6 characters)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+          />
+          {formError && (
+            <p className="text-sm text-[var(--danger)]">{formError}</p>
+          )}
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="ghost" type="button" onClick={() => { setShowResetPasswordModal(false); setSelectedUser(null); setNewPassword(''); }}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" loading={resetPasswordLoading}>
+              <KeyRound className="w-4 h-4 mr-2" />
+              Reset Password
             </Button>
           </div>
         </form>
