@@ -24,8 +24,8 @@ export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
   },
   cookieOptions: {
     maxAge: getSessionExpiry(),
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'none',
+    secure: true,
   },
 });
 
@@ -38,8 +38,8 @@ export function createFreshClient() {
     },
     cookieOptions: {
       maxAge: getSessionExpiry(),
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'none',
+      secure: true,
     },
   });
 }
