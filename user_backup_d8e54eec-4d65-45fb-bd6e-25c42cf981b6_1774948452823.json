@@ -1,0 +1,44 @@
+{
+  "user": {
+    "id": "d8e54eec-4d65-45fb-bd6e-25c42cf981b6",
+    "aud": "authenticated",
+    "role": "authenticated",
+    "email": "a.bennis@medidis.ma",
+    "email_confirmed_at": "2026-02-21T10:53:25.113904Z",
+    "phone": "",
+    "confirmed_at": "2026-02-21T10:53:25.113904Z",
+    "recovery_sent_at": "2026-03-23T13:44:41.37545Z",
+    "last_sign_in_at": "2026-03-31T07:24:50.585282Z",
+    "app_metadata": {
+      "provider": "email",
+      "providers": [
+        "email"
+      ]
+    },
+    "user_metadata": {
+      "email_verified": true
+    },
+    "identities": [
+      {
+        "identity_id": "50505544-1357-4aff-871d-d5575cf0555c",
+        "id": "d8e54eec-4d65-45fb-bd6e-25c42cf981b6",
+        "user_id": "d8e54eec-4d65-45fb-bd6e-25c42cf981b6",
+        "identity_data": {
+          "email": "a.bennis@medidis.ma",
+          "email_verified": false,
+          "phone_verified": false,
+          "sub": "d8e54eec-4d65-45fb-bd6e-25c42cf981b6"
+        },
+        "provider": "email",
+        "last_sign_in_at": "2026-02-21T10:53:25.111467Z",
+        "created_at": "2026-02-21T10:53:25.111534Z",
+        "updated_at": "2026-02-21T10:53:25.111534Z",
+        "email": "a.bennis@medidis.ma"
+      }
+    ],
+    "created_at": "2026-02-21T10:53:25.089286Z",
+    "updated_at": "2026-03-31T08:48:56.499345Z",
+    "is_anonymous": false
+  },
+  "timestamp": "2026-03-31T09:14:12.813Z"
+}

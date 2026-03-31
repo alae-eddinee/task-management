@@ -64,15 +64,35 @@ export default function LoginPage() {
     setLoading(true);
     loginAttempted.current = true;
 
-    const { error } = await signIn(email, password, rememberMe);
+    try {
+      const { error } = await signIn(email, password, rememberMe);
 
-    if (error) {
-      setError(error.message);
+      if (error) {
+        console.error('[Login] SignIn returned error:', error.message);
+        setError(error.message || 'Login failed. Please check your credentials.');
+        setLoading(false);
+        return;
+      }
+
+      // Wait for profile to load - the useEffect will handle redirect
+      console.log('[Login] SignIn successful, waiting for auth state...');
+      
+      // Add a safety timeout - if auth state doesn't update in 5 seconds, show error
+      setTimeout(() => {
+        if (loginAttempted.current && !user) {
+          console.error('[Login] Auth state timeout - no user after 5s');
+          setError('Login timed out. Please clear browser data and try again.');
+          setLoading(false);
+          loginAttempted.current = false;
+        }
+      }, 5000);
+      
+    } catch (err) {
+      console.error('[Login] Exception during signIn:', err);
+      setError('An unexpected error occurred. Please try again.');
       setLoading(false);
-      return;
+      loginAttempted.current = false;
     }
-
-    // Wait for profile to load - the useEffect will handle redirect
   };
 
   return (
@@ -134,7 +154,27 @@ export default function LoginPage() {
           </label>
 
           {error && (
-            <p className="text-sm text-[var(--danger)] text-center">{error}</p>
+            <div className="space-y-2">
+              <p className="text-sm text-[var(--danger)] text-center">{error}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  // Clear all auth-related storage
+                  localStorage.clear();
+                  sessionStorage.clear();
+                  // Clear cookies by setting expired date
+                  document.cookie.split(';').forEach(cookie => {
+                    const [name] = cookie.split('=');
+                    document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+                  });
+                  setError('Browser data cleared. Please try logging in again.');
+                  window.location.reload();
+                }}
+                className="text-xs text-[var(--foreground-tertiary)] hover:text-[var(--danger)] underline text-center w-full"
+              >
+                Clear browser data and reload
+              </button>
+            </div>
           )}
 
           <Button type="submit" className="w-full" loading={loading}>

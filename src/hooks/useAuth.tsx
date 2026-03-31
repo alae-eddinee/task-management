@@ -139,26 +139,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('rememberMe', rememberMe.toString());
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      return { error: new Error(error.message) };
-    }
-
-    // If remember me is enabled, explicitly set session with long expiry
-    // This ensures the session persists across browser restarts
-    if (rememberMe && data.session) {
-      // Set session to persist indefinitely
-      await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
-    }
 
-    return { error: null };
+      if (error) {
+        console.error('[useAuth] SignIn error:', error.message, error.code);
+        return { error: new Error(error.message) };
+      }
+
+      if (!data.session) {
+        console.error('[useAuth] No session returned');
+        return { error: new Error('Login failed - no session created') };
+      }
+
+      console.log('[useAuth] SignIn successful, session:', data.session.user?.id);
+
+      // If remember me is enabled, explicitly set session with long expiry
+      // This ensures the session persists across browser restarts
+      if (rememberMe && data.session) {
+        // Set session to persist indefinitely
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        
+        if (setSessionError) {
+          console.error('[useAuth] SetSession error:', setSessionError.message);
+          // Don't fail here - session might still work
+        }
+      }
+
+      return { error: null };
+    } catch (err) {
+      console.error('[useAuth] SignIn exception:', err);
+      return { error: err instanceof Error ? err : new Error('Unknown login error') };
+    }
   };
 
   const signOut = async () => {
