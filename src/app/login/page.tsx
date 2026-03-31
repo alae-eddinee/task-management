@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
+  const [errorDetails, setErrorDetails] = useState('');
   const [loading, setLoading] = useState(false);
   const { signIn, profile, loading: authLoading, user } = useAuth();
   const router = useRouter();
@@ -61,8 +62,19 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setErrorDetails('');
     setLoading(true);
     loginAttempted.current = true;
+
+    // Diagnostic info
+    const diagnostics = {
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      timestamp: new Date().toISOString(),
+      localStorage: typeof window !== 'undefined' ? Object.keys(localStorage) : [],
+      cookies: document.cookie ? 'present' : 'none',
+    };
+    console.log('[Login] Diagnostics:', diagnostics);
 
     try {
       const { error } = await signIn(email, password, rememberMe);
@@ -70,6 +82,7 @@ export default function LoginPage() {
       if (error) {
         console.error('[Login] SignIn returned error:', error.message);
         setError(error.message || 'Login failed. Please check your credentials.');
+        setErrorDetails(`Error: ${error.message}\nTime: ${new Date().toLocaleString()}\nBrowser: ${navigator.userAgent.slice(0, 50)}...`);
         setLoading(false);
         return;
       }
@@ -81,7 +94,8 @@ export default function LoginPage() {
       setTimeout(() => {
         if (loginAttempted.current && !user) {
           console.error('[Login] Auth state timeout - no user after 5s');
-          setError('Login timed out. Please clear browser data and try again.');
+          setError('Login timed out. Session not established.');
+          setErrorDetails('The server accepted your credentials but could not establish a session.\n\nPossible causes:\n- Browser extensions blocking cookies\n- Corporate firewall blocking auth\n- Clock/time sync issues on device\n\nTry: Clear browser data or use a different browser.');
           setLoading(false);
           loginAttempted.current = false;
         }
@@ -89,7 +103,9 @@ export default function LoginPage() {
       
     } catch (err) {
       console.error('[Login] Exception during signIn:', err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
       setError('An unexpected error occurred. Please try again.');
+      setErrorDetails(`Exception: ${errorMsg}\n\nThis may indicate:\n- Network connectivity issues\n- Browser blocking requests\n- JavaScript errors\n\nTry: Check internet connection, disable ad blockers, or use incognito mode.`);
       setLoading(false);
       loginAttempted.current = false;
     }
@@ -155,25 +171,60 @@ export default function LoginPage() {
 
           {error && (
             <div className="space-y-2">
-              <p className="text-sm text-[var(--danger)] text-center">{error}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  // Clear all auth-related storage
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  // Clear cookies by setting expired date
-                  document.cookie.split(';').forEach(cookie => {
-                    const [name] = cookie.split('=');
-                    document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-                  });
-                  setError('Browser data cleared. Please try logging in again.');
-                  window.location.reload();
-                }}
-                className="text-xs text-[var(--foreground-tertiary)] hover:text-[var(--danger)] underline text-center w-full"
-              >
-                Clear browser data and reload
-              </button>
+              <p className="text-sm text-[var(--danger)] text-center font-medium">{error}</p>
+              {errorDetails && (
+                <details className="text-xs text-[var(--foreground-tertiary)] bg-[var(--background-tertiary)] rounded p-2">
+                  <summary className="cursor-pointer hover:text-[var(--foreground-secondary)]">
+                    Show technical details
+                  </summary>
+                  <pre className="mt-2 whitespace-pre-wrap break-all text-[10px] font-mono">
+                    {errorDetails}
+                  </pre>
+                </details>
+              )}
+              <div className="flex gap-2 justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    document.cookie.split(';').forEach(cookie => {
+                      const [name] = cookie.split('=');
+                      document.cookie = `${name.trim()}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+                    });
+                    setError('Browser data cleared. Please try logging in again.');
+                    setErrorDetails('');
+                    window.location.reload();
+                  }}
+                  className="text-xs text-[var(--foreground-tertiary)] hover:text-[var(--danger)] underline"
+                >
+                  Clear browser data
+                </button>
+                <span className="text-[var(--foreground-tertiary)]">|</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const helpText = `TROUBLESHOOTING STEPS:
+
+1. Check CAPS LOCK - Password is case-sensitive
+2. Try typing password in "Show password" field to verify
+3. Use Incognito/Private mode (Ctrl+Shift+N)
+4. Try different browser (Chrome, Firefox, Edge)
+5. Disable browser extensions (ad blockers, privacy tools)
+6. Check system clock is correct (right-click clock > Adjust date/time)
+7. Try different network (mobile hotspot)
+
+If none work, contact admin with:
+- Screenshot of error
+- Browser name and version
+- Device type (Windows/Mac/Phone)`;
+                    alert(helpText);
+                  }}
+                  className="text-xs text-[var(--foreground-tertiary)] hover:text-[var(--primary)] underline"
+                >
+                  Troubleshooting tips
+                </button>
+              </div>
             </div>
           )}
 
